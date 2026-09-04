@@ -5,7 +5,17 @@ import type React from "react"
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { CheckCircle2, Clock, Loader2, UserPlus, Users, Wallet } from "lucide-react"
 import { toast } from "sonner"
-import { Sidebar } from "@/components/pos/sidebar"
+import { NavHeader } from "@/components/pos/nav-header"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { AutocompleteField, type AutocompleteOption } from "@/components/purchases/autocomplete-field"
 import {
   PosCustomerService,
@@ -60,6 +70,7 @@ export default function ReceivablesPage() {
   const [payMethod, setPayMethod] = useState("")
   const [payNotes, setPayNotes] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [paymentToConfirm, setPaymentToConfirm] = useState<{sale: PosSaleWithRelations, amount: number} | null>(null)
 
   const loadSales = useCallback(async () => {
     setSalesLoading(true)
@@ -152,7 +163,7 @@ export default function ReceivablesPage() {
     setPayingSaleId(null)
   }
 
-  async function handleRecordPayment(e: React.FormEvent<HTMLFormElement>, sale: PosSaleWithRelations) {
+  function handleRecordPayment(e: React.FormEvent<HTMLFormElement>, sale: PosSaleWithRelations) {
     e.preventDefault()
     if (!selectedCustomer) return
 
@@ -162,12 +173,18 @@ export default function ReceivablesPage() {
       return
     }
 
+    setPaymentToConfirm({ sale, amount })
+  }
+
+  async function confirmPayment() {
+    if (!selectedCustomer || !paymentToConfirm) return
+
     setSubmitting(true)
     try {
       await PosCustomerPaymentService.create({
         customer_id: selectedCustomer.id,
-        sale_id: sale.id,
-        amount,
+        sale_id: paymentToConfirm.sale.id,
+        amount: paymentToConfirm.amount,
         payment_date: payDate,
         payment_method: payMethod.trim() || undefined,
         notes: payNotes.trim() || undefined,
@@ -181,37 +198,29 @@ export default function ReceivablesPage() {
       toast.error(error instanceof Error ? error.message : "Failed to record payment")
     } finally {
       setSubmitting(false)
+      setPaymentToConfirm(null)
     }
   }
 
-  return (
-    <main className="h-full w-full flex flex-col overflow-hidden">
-      <div className="flex-1 flex flex-col p-3 gap-3 overflow-hidden">
-        <div className="pos-panel flex-1 flex overflow-hidden">
-          <div className="flex gap-3 flex-1 overflow-hidden">
-            <Sidebar />
-            <section className="flex-1 flex flex-col gap-4 overflow-y-auto p-4">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <h1 className="text-2xl font-bold">Customer Receivables</h1>
-                  <p className="text-sm text-muted-foreground">
-                    Track what customers owe and record payments against their sales
-                  </p>
-                </div>
-                <div className="pos-panel rounded-xl px-4 py-2.5 flex items-center gap-2">
-                  <Wallet className="w-4 h-4 text-amber-500" />
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                      Total Outstanding
-                    </p>
-                    <p className="text-lg font-bold text-amber-500">{formatMoney(totalOutstanding)}</p>
-                  </div>
-                </div>
-              </div>
+  const customersWithBalance = customerSummaries.filter(c => c.outstanding > 0).length
 
-              <div className="grid gap-4 lg:grid-cols-[1fr_2fr] min-h-0 flex-1">
-                {/* Customer list + create/select */}
-                <div className="pos-panel rounded-lg p-4 flex flex-col gap-3 min-w-0">
+  return (
+    <main className="h-full w-full flex flex-col overflow-hidden bg-[var(--pos-panel-2)] text-foreground">
+      <NavHeader />
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto px-4 py-5 space-y-5">
+          {/* Total Receivable Summary Card */}
+          <div className="pos-panel rounded-xl p-6 flex flex-col items-center justify-center text-center space-y-2 border border-[var(--pos-stroke)]">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Total Receivable</h2>
+            <p className="text-4xl font-bold text-amber-500">{formatMoney(totalOutstanding)}</p>
+            <p className="text-sm text-muted-foreground">
+              From {customersWithBalance} customer{customersWithBalance === 1 ? "" : "s"} with outstanding balances
+            </p>
+          </div>
+
+          <div className="flex flex-col lg:flex-row gap-5">
+            {/* Customer list + create/select */}
+            <div className="pos-panel rounded-lg p-4 flex flex-col gap-3 w-full lg:w-80 shrink-0">
                   <h2 className="text-sm font-bold flex items-center gap-2">
                     <Users className="w-4 h-4" /> Customers
                   </h2>
@@ -281,7 +290,7 @@ export default function ReceivablesPage() {
                 </div>
 
                 {/* Detail: sales + payment history for the selected customer */}
-                <div className="flex flex-col gap-4 min-w-0 overflow-y-auto">
+                <div className="flex flex-col gap-4 w-full lg:flex-1 min-w-0">
                   {!selectedSummary ? (
                     <div className="pos-panel rounded-lg p-8 flex items-center justify-center text-sm text-muted-foreground">
                       Search or select a customer to view sales and record payments
@@ -389,7 +398,7 @@ export default function ReceivablesPage() {
                                           <td colSpan={7} className="py-3">
                                             <form
                                               onSubmit={(e) => handleRecordPayment(e, s)}
-                                              className="bg-foreground/5 rounded-xl p-4 grid gap-3 sm:grid-cols-4 items-end"
+                                              className="bg-foreground/5 rounded-xl p-4 grid gap-3 grid-cols-1 sm:grid-cols-4 items-end"
                                             >
                                               <div>
                                                 <label
@@ -531,11 +540,26 @@ export default function ReceivablesPage() {
                     </>
                   )}
                 </div>
-              </div>
-            </section>
           </div>
         </div>
       </div>
+
+      <AlertDialog open={!!paymentToConfirm} onOpenChange={(open) => !open && setPaymentToConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Payment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Record payment of Rs {paymentToConfirm?.amount} from {selectedCustomer?.name}?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPayment} disabled={submitting}>
+              {submitting ? "Saving..." : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   )
 }

@@ -47,7 +47,7 @@
   --pos-accent-pink-text: oklch(0.45 0.14 15);
   --pos-accent-blue-text: oklch(0.42 0.15 240);
   --pos-accent-purple-text: oklch(0.42 0.15 300);
-  
+
   --pos-panel: oklch(0.98 0.01 200); /* Soft off-white blue-gray */
   --pos-panel-2: oklch(0.94 0.01 200); /* Light slate backing */
   --pos-stroke: oklch(0.88 0.01 200); /* Soft gray-border accent */
@@ -100,7 +100,7 @@
   --pos-accent-pink-text: oklch(0.86 0.1 15);
   --pos-accent-blue-text: oklch(0.88 0.07 235);
   --pos-accent-purple-text: oklch(0.87 0.07 300);
-  
+
   --scrollbar-thumb: rgba(255, 255, 255, 0.15);
   --scrollbar-hover: rgba(255, 255, 255, 0.25);
 }
@@ -165,7 +165,7 @@
   }
   html,
   body {
-    @apply h-full w-full overflow-hidden;
+    @apply h-full w-full overflow-x-hidden;
   }
 }
 
@@ -282,7 +282,8 @@
   }
 
   @keyframes skeleton-loading {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 1;
     }
     50% {

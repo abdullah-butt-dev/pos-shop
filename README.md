@@ -1,4 +1,4 @@
-# SSG Store — POS System
+# Perfect Traders — POS System
 
 > A fast, modern Point of Sale system built for real businesses. Handles orders, inventory, billing, and analytics — all in one clean interface.
 
@@ -176,5 +176,5 @@ MIT — free to use, modify, and deploy.
 
 ---
 
-*Built by Divyansh Baghel · 2026*
+*Built by Perfect Traders · 2026*
 # pos-shop

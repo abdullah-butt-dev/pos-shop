@@ -6,12 +6,28 @@ function escapeLikePattern(input: string) {
 }
 
 // GET /api/pos/suppliers?q=abc -> autocomplete matches while typing
+// GET /api/pos/suppliers?all=1 -> list all suppliers
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const q = (searchParams.get('q') || '').trim()
+    const all = searchParams.get('all') === '1'
 
     const supabaseAdmin = getSupabaseAdmin()
+
+    if (all) {
+      const { data, error } = await supabaseAdmin
+        .from('pos_suppliers')
+        .select('id, name, phone, address, notes, is_active, created_at')
+        .order('name', { ascending: true })
+
+      if (error) {
+        console.error('[API /api/pos/suppliers] Supabase error:', error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+      return NextResponse.json({ data: data || [] })
+    }
+
     let query = supabaseAdmin
       .from('pos_suppliers')
       .select('id, name')

@@ -12,7 +12,7 @@ import {
   Wallet,
   Users,
   CircleDollarSign,
-} from "lucide-react"
+} from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -83,7 +83,7 @@ export function Sidebar() {
     <aside className="pos-panel w-64 shrink-0 p-4 flex flex-col gap-4">
       <header className="flex items-center gap-2 px-1">
         <Menu className="h-5 w-5" aria-hidden />
-        <span className="font-semibold">SSG Store</span>
+        <span className="font-semibold">Perfect Traders</span>
       </header>
 
       <nav className="grid gap-1">
@@ -101,7 +101,7 @@ export function Sidebar() {
 
       {/* Profile Section */}
       <div className="mt-auto pt-4 border-t border-[var(--pos-stroke)]">
-        {user ? (
+        {user && (
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs uppercase shrink-0 shadow-inner border bg-[var(--pos-brand)]/15 text-[var(--pos-brand-text)] border-[var(--pos-brand)]/30">
               {(user.user_metadata?.full_name || user.email)?.charAt(0)}
@@ -115,14 +115,7 @@ export function Sidebar() {
               </p>
             </div>
           </div>
-        ) : (
-          <div className="text-center text-xs text-foreground/40">
-            Offline Mode
-          </div>
         )}
-        <div className="text-[10px] text-muted-foreground text-center mt-3">
-          Made by Divyansh Baghel
-        </div>
       </div>
     </aside>
   );

@@ -1,14 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
-// PATCH /api/pos/products/[id] { name?, unit?, low_stock_threshold?, is_active? }
-// Used by the Inventory page to edit product master data or to
-// deactivate/reactivate a product. Products are never hard-deleted here:
-// pos_purchase_items / pos_sale_items reference products with
-// ON DELETE RESTRICT, so a product that has ever been purchased or sold
-// can't be removed without corrupting purchase/sale history. Deactivating
-// (is_active = false) hides it from the POS and from autocomplete search
-// while keeping every historical record intact.
+// PATCH /api/pos/suppliers/[id] { name?, phone?, address?, notes?, is_active? }
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } },
@@ -25,23 +18,16 @@ export async function PATCH(
       updates.name = name
     }
 
-    if (typeof body?.unit === 'string') {
-      const unit = body.unit.trim()
-      if (!unit) {
-        return NextResponse.json({ error: 'unit cannot be empty' }, { status: 400 })
-      }
-      updates.unit = unit
+    if (body?.phone !== undefined) {
+      updates.phone = typeof body.phone === 'string' ? body.phone.trim() || null : null
     }
 
-    if (body?.low_stock_threshold !== undefined) {
-      const threshold = Number(body.low_stock_threshold)
-      if (!Number.isFinite(threshold) || threshold < 0) {
-        return NextResponse.json(
-          { error: 'low_stock_threshold must be zero or greater' },
-          { status: 400 },
-        )
-      }
-      updates.low_stock_threshold = threshold
+    if (body?.address !== undefined) {
+      updates.address = typeof body.address === 'string' ? body.address.trim() || null : null
+    }
+
+    if (body?.notes !== undefined) {
+      updates.notes = typeof body.notes === 'string' ? body.notes.trim() || null : null
     }
 
     if (typeof body?.is_active === 'boolean') {
@@ -54,24 +40,24 @@ export async function PATCH(
 
     const supabaseAdmin = getSupabaseAdmin()
     const { data, error } = await supabaseAdmin
-      .from('pos_products')
+      .from('pos_suppliers')
       .update(updates)
       .eq('id', params.id)
-      .select('id, name, unit, low_stock_threshold, is_active')
+      .select('id, name, phone, address, notes, is_active, created_at')
       .single()
 
     if (error) {
-      // Unique violation: another product already has this name.
+      // Unique violation: another supplier already has this name.
       if (error.code === '23505') {
-        return NextResponse.json({ error: 'A product with this name already exists' }, { status: 409 })
+        return NextResponse.json({ error: 'A supplier with this name already exists' }, { status: 409 })
       }
-      console.error('[API /api/pos/products/[id]] Update error:', error)
+      console.error('[API /api/pos/suppliers/[id]] Update error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ data })
   } catch (err: any) {
-    console.error('[API /api/pos/products/[id]] Unexpected error:', err)
+    console.error('[API /api/pos/suppliers/[id]] Unexpected error:', err)
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }
@@ -83,24 +69,24 @@ export async function DELETE(
   try {
     const supabaseAdmin = getSupabaseAdmin()
     const { error } = await supabaseAdmin
-      .from('pos_products')
+      .from('pos_suppliers')
       .delete()
       .eq('id', params.id)
 
     if (error) {
       if (error.code === '23503') {
         return NextResponse.json(
-          { error: 'Cannot delete this product because it has existing purchase or sale records' },
+          { error: 'Cannot delete this supplier because it has existing purchase records' },
           { status: 409 },
         )
       }
-      console.error('[API /api/pos/products/[id]] Delete error:', error)
+      console.error('[API /api/pos/suppliers/[id]] Delete error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
-    console.error('[API /api/pos/products/[id]] Unexpected error:', err)
+    console.error('[API /api/pos/suppliers/[id]] Unexpected error:', err)
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }

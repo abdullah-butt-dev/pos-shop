@@ -6,11 +6,11 @@ import { Suspense } from "react"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "SSG Store - Modern POS System",
-  description: "Advanced Point of Sale system with inventory management, bill history, and mobile-first design",
-  generator: "SSG Store",
-  keywords: ["POS", "Point of Sale", "Inventory", "Restaurant", "Billing"],
-  authors: [{ name: "SSG Store" }],
+  title: "Perfect Traders — POS",
+  description: "Point of Sale system for Perfect Traders, Suraj Miani Road, Multan",
+  generator: "Perfect Traders",
+  keywords: ["POS", "Point of Sale", "Inventory", "Billing"],
+  authors: [{ name: "Perfect Traders" }],
   manifest: "/manifest.json",
 }
 

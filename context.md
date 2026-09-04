@@ -1,4 +1,4 @@
-# Project Context: SSG Store POS System
+# Project Context: Perfect Traders POS System
 
 Developer reference document. Describes the architecture, file map, and the history of all significant changes made to this codebase.
 

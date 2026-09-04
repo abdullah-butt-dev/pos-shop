@@ -43,7 +43,7 @@ export default function LoginPage() {
 
       if (error) throw error
 
-      router.push("/orders")
+      router.push("/")
     } catch (err: any) {
       setError(err.message || "An error occurred during authentication.")
     } finally {
@@ -64,10 +64,10 @@ export default function LoginPage() {
             <Sparkles className="h-6 w-6 text-black font-bold" />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-            SSG Store POS
+            Perfect Traders
           </h1>
           <p className="text-xs text-muted-foreground mt-2">
-            Sign in to access your point of sale
+            Sign in to manage your shop
           </p>
         </div>
 

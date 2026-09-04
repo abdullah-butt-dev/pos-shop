@@ -161,6 +161,32 @@ export class PosProductService {
       throw error instanceof Error ? error : new Error("Failed to update product")
     }
   }
+
+  static async delete(id: string): Promise<void> {
+    const res = await fetch(`/api/pos/products/${id}`, { method: 'DELETE' })
+    const json = await res.json()
+    if (!res.ok || json.error) {
+      throw new Error(json.error || 'Failed to delete product')
+    }
+  }
+}
+
+export interface PosSupplierRow {
+  id: string
+  name: string
+  phone: string | null
+  address: string | null
+  notes: string | null
+  is_active: boolean
+  created_at?: string
+}
+
+export interface PosSupplierUpdateInput {
+  name?: string
+  phone?: string | null
+  address?: string | null
+  notes?: string | null
+  is_active?: boolean
 }
 
 export class PosSupplierService {
@@ -170,6 +196,55 @@ export class PosSupplierService {
 
   static create(name: string): Promise<PosAutocompleteOption | null> {
     return createByName("/api/pos/suppliers", name)
+  }
+
+  static async listAll(): Promise<PosSupplierRow[]> {
+    try {
+      const res = await fetch("/api/pos/suppliers?all=1")
+      const json = await res.json()
+
+      if (!res.ok || json.error) {
+        console.error("Error listing suppliers:", json.error)
+        return []
+      }
+
+      return json.data || []
+    } catch (error) {
+      console.error("Error in PosSupplierService.listAll:", error)
+      return []
+    }
+  }
+
+  static async update(
+    id: string,
+    input: PosSupplierUpdateInput,
+  ): Promise<PosSupplierRow | null> {
+    try {
+      const res = await fetch(`/api/pos/suppliers/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      })
+
+      const json = await res.json()
+
+      if (!res.ok || json.error) {
+        throw new Error(json.error || "Failed to update supplier")
+      }
+
+      return json.data
+    } catch (error) {
+      console.error("Error in PosSupplierService.update:", error)
+      throw error instanceof Error ? error : new Error("Failed to update supplier")
+    }
+  }
+
+  static async delete(id: string): Promise<void> {
+    const res = await fetch(`/api/pos/suppliers/${id}`, { method: 'DELETE' })
+    const json = await res.json()
+    if (!res.ok || json.error) {
+      throw new Error(json.error || 'Failed to delete supplier')
+    }
   }
 }
 

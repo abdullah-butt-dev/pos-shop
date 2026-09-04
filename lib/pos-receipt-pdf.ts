@@ -9,22 +9,30 @@ export interface PosReceiptItem {
 
 export interface PosReceiptData {
   shopName: string
+  shopAddress?: string
+  shopPhone?: string
   receiptNumber: string
   dateTime: string
   customerName: string
   items: PosReceiptItem[]
+  itemCount?: number
+  unitCount?: number
   grandTotal: number
   paidAmount: number
   remainingAmount: number
   paymentStatus: string
+  paymentMode?: string
   currency?: string
 }
 
 const money = (
   value: number,
-  currency = 'PKR',
+  _currency = 'PKR',
 ) =>
-  `${currency} ${Number(value || 0).toFixed(2)}`
+  `Rs${Number(value || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
 
 export function generatePosReceiptPDF(
   receipt: PosReceiptData,
@@ -34,8 +42,8 @@ export function generatePosReceiptPDF(
   const contentWidth = width - margin * 2
 
   const estimatedHeight = Math.max(
-    125,
-    76 + receipt.items.length * 9,
+    155,
+    110 + receipt.items.length * 9,
   )
 
   const doc = new jsPDF({
@@ -55,7 +63,23 @@ export function generatePosReceiptPDF(
     { align: 'center' },
   )
 
-  y += 6
+  y += 5
+
+  if (receipt.shopAddress) {
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.text(receipt.shopAddress, width / 2, y, { align: 'center' })
+    y += 4
+  }
+
+  if (receipt.shopPhone) {
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.text(receipt.shopPhone, width / 2, y, { align: 'center' })
+    y += 4
+  }
+
+  y += 2
 
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
@@ -72,7 +96,7 @@ export function generatePosReceiptPDF(
   doc.setFontSize(8)
 
   doc.text(
-    `Bill: ${receipt.receiptNumber}`,
+    `Receipt: ${receipt.receiptNumber}`,
     margin,
     y,
   )
@@ -92,6 +116,23 @@ export function generatePosReceiptPDF(
       receipt.customerName ||
       'Walk-in Customer'
     }`,
+    margin,
+    y,
+  )
+
+  y += 4
+
+  if (receipt.paymentMode) {
+    doc.text(
+      `P Mode: ${receipt.paymentMode}`,
+      margin,
+      y,
+    )
+    y += 4
+  }
+
+  doc.text(
+    `I#: ${receipt.itemCount || 0}  U#: ${receipt.unitCount || 0}  Amount: ${receipt.currency || 'PKR'} ${receipt.grandTotal}`,
     margin,
     y,
   )
@@ -195,7 +236,7 @@ export function generatePosReceiptPDF(
 
   const rows = [
     [
-      'Grand Total',
+      'Subtotal',
       money(
         receipt.grandTotal,
         receipt.currency,
@@ -218,6 +259,13 @@ export function generatePosReceiptPDF(
     [
       'Status',
       receipt.paymentStatus.toUpperCase(),
+    ],
+    [
+      'Grand Total',
+      money(
+        receipt.grandTotal,
+        receipt.currency,
+      ),
     ],
   ]
 

@@ -25,15 +25,11 @@ export async function GET() {
   }
 }
 
-// POST /api/pos/purchases -> creates the purchase header, every line item,
-// and an optional initial supplier payment in one transaction via the
-// pos_create_purchase RPC (see supabase-pos-purchase-entry.sql). Existing
-// Feature 2 triggers then update stock, log the inventory movement, and
-// compute the supplier amount due.
+// POST /api/pos/purchases -> creates the purchase header, line items, and optional payment.
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { supplier_id, purchase_date, reference_number, notes, items, amount_paid, payment_method } = body || {}
+    const { supplier_id, purchase_date, items, amount_paid, payment_method } = body || {}
 
     if (!supplier_id || typeof supplier_id !== 'string') {
       return NextResponse.json({ error: 'supplier_id is required' }, { status: 400 })
@@ -57,8 +53,6 @@ export async function POST(request: Request) {
     const { data: purchaseId, error: rpcError } = await supabaseAdmin.rpc('pos_create_purchase', {
       p_supplier_id: supplier_id,
       p_purchase_date: purchase_date || null,
-      p_reference_number: reference_number || null,
-      p_notes: notes || null,
       p_items: items.map((item: any) => ({
         product_id: item.product_id,
         quantity: Number(item.quantity),

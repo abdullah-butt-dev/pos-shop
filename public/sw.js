@@ -1,7 +1,7 @@
-// Service Worker for SSG Store POS System
-const CACHE_NAME = 'ssg-store-v1.0'
-const STATIC_CACHE = 'ssg-store-static-v1.0'
-const DYNAMIC_CACHE = 'ssg-store-dynamic-v1.0'
+// Service Worker for Perfect Traders POS System
+const CACHE_NAME = 'pt-store-v1.0'
+const STATIC_CACHE = 'pt-store-static-v1.0'
+const DYNAMIC_CACHE = 'pt-store-dynamic-v1.0'
 
 // Assets to cache immediately
 const STATIC_ASSETS = [
@@ -180,7 +180,7 @@ self.addEventListener('push', (event) => {
         body: data.body,
         icon: '/icon-192.png',
         badge: '/icon-192.png',
-        tag: 'ssg-store-notification',
+        tag: 'pt-store-notification',
         actions: [
           {
             action: 'view',

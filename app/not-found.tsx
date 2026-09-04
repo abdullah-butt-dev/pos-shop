@@ -59,8 +59,6 @@ export default function NotFound() {
           Or go to New Order
         </Link>
 
-        {/* Footer */}
-        <p className="text-[10px] text-muted-foreground">Made by Divyansh Baghel</p>
       </div>
     </div>
   )

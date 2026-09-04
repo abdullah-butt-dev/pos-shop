@@ -1,7 +1,7 @@
 {
-  "name": "SSG Store - POS System",
-  "short_name": "SSG Store",
-  "description": "Modern Point of Sale system with inventory management",
+  "name": "Perfect Traders - POS System",
+  "short_name": "Perfect Traders",
+  "description": "Point of Sale system for Perfect Traders, with inventory management",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1a1a1a",

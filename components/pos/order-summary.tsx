@@ -1,162 +1,155 @@
-"use client"
+"use client";
 
-import {
-  Check,
-  Minus,
-  Plus,
-  ShoppingBag,
-  Trash2,
-  User,
-} from "lucide-react"
-import { useEffect, useState } from "react"
-import { toast } from "sonner"
-import { useCart } from "./cart-context"
+import { Check, Minus, Plus, ShoppingBag, Trash2, User } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { useCart } from "./cart-context";
 import {
   PosCustomerService,
   PosSaleService,
-} from "@/lib/pos-service"
+  PosSettingsService,
+} from "@/lib/pos-service";
 import {
   AutocompleteField,
   type AutocompleteOption,
-} from "@/components/purchases/autocomplete-field"
+} from "@/components/purchases/autocomplete-field";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { generatePosReceiptPDF } from "@/lib/pos-receipt-pdf";
 
-type PaymentMode = "paid" | "credit" | "partial"
+type PaymentMode = "paid" | "credit" | "partial";
 
 export function OrderSummary({
   refetchData,
 }: {
-  refetchData?: () => void | Promise<void>
+  refetchData?: () => void | Promise<void>;
 }) {
-  const {
-    items,
-    subtotal,
-    clear,
-    inc,
-    dec,
-    remove,
-    setQty,
-    setPrice,
-  } = useCart()
+  const { items, subtotal, clear, inc, dec, remove, setQty, setPrice } =
+    useCart();
 
-  const [customer, setCustomer] =
-    useState<AutocompleteOption | null>(null)
+  const [customer, setCustomer] = useState<AutocompleteOption | null>(null);
 
-  const [paymentMode, setPaymentMode] =
-    useState<PaymentMode>("paid")
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>("paid");
 
-  const [paidAmount, setPaidAmount] =
-    useState("")
+  const [paidAmount, setPaidAmount] = useState("");
 
-  const [saving, setSaving] = useState(false)
-  const [success, setSuccess] = useState(false)
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (paymentMode === "paid") {
-      setPaidAmount(subtotal > 0 ? subtotal.toFixed(2) : "")
-      return
+      setPaidAmount(subtotal > 0 ? subtotal.toFixed(2) : "");
+      return;
     }
 
     if (paymentMode === "credit") {
-      setPaidAmount("0")
-      return
+      setPaidAmount("0");
+      return;
     }
 
-    const current = Number(paidAmount)
+    const current = Number(paidAmount);
 
-    if (
-      !Number.isFinite(current) ||
-      current <= 0 ||
-      current >= subtotal
-    ) {
-      setPaidAmount("")
+    if (!Number.isFinite(current) || current <= 0 || current >= subtotal) {
+      setPaidAmount("");
     }
-  }, [subtotal, paymentMode])
+  }, [subtotal, paymentMode]);
 
-  const numericPaidAmount = Number(paidAmount)
+  const numericPaidAmount = Number(paidAmount);
   const remaining =
-    subtotal - (Number.isFinite(numericPaidAmount) ? numericPaidAmount : 0)
+    subtotal - (Number.isFinite(numericPaidAmount) ? numericPaidAmount : 0);
 
   const selectPaymentMode = (mode: PaymentMode) => {
-    setPaymentMode(mode)
+    setPaymentMode(mode);
 
     if (mode === "paid") {
-      setPaidAmount(subtotal > 0 ? subtotal.toFixed(2) : "")
+      setPaidAmount(subtotal > 0 ? subtotal.toFixed(2) : "");
     } else if (mode === "credit") {
-      setPaidAmount("0")
+      setPaidAmount("0");
     } else {
-      setPaidAmount("")
+      setPaidAmount("");
     }
-  }
+  };
 
-  const handlePaidAmountChange = (
-    value: string,
-  ) => {
-    setPaidAmount(value)
+  const handlePaidAmountChange = (value: string) => {
+    setPaidAmount(value);
 
-    const amount = Number(value)
+    const amount = Number(value);
 
     if (!Number.isFinite(amount)) {
-      return
+      return;
     }
 
     if (amount === 0) {
-      setPaymentMode("credit")
+      setPaymentMode("credit");
     } else if (amount >= subtotal) {
-      setPaymentMode("paid")
+      setPaymentMode("paid");
     } else {
-      setPaymentMode("partial")
+      setPaymentMode("partial");
     }
-  }
+  };
 
-  const handleSaveSale = async () => {
+  const handleValidateAndPrompt = () => {
     if (items.length === 0) {
-      toast.error("Please add at least one product")
-      return
+      toast.error("Please add at least one product");
+      return;
     }
 
     for (const item of items) {
       if (!Number.isFinite(item.qty) || item.qty <= 0) {
-        toast.error(`Invalid quantity for ${item.name}`)
-        return
+        toast.error(`Invalid quantity for ${item.name}`);
+        return;
       }
 
       if (!Number.isFinite(item.price) || item.price <= 0) {
-        toast.error(`Enter a selling price for ${item.name}`)
-        return
+        toast.error(`Enter a selling price for ${item.name}`);
+        return;
       }
     }
 
-    const amount = Number(paidAmount)
+    const amount = Number(paidAmount);
 
     if (!Number.isFinite(amount) || amount < 0) {
-      toast.error("Paid amount must be zero or greater")
-      return
+      toast.error("Paid amount must be zero or greater");
+      return;
     }
 
     if (amount > subtotal + 0.009) {
-      toast.error("Paid amount cannot be greater than the sale total")
-      return
+      toast.error("Paid amount cannot be greater than the sale total");
+      return;
     }
 
     const normalizedAmount =
-      Math.abs(amount - subtotal) <= 0.009
-        ? subtotal
-        : amount
+      Math.abs(amount - subtotal) <= 0.009 ? subtotal : amount;
 
-    const isOutstanding =
-      subtotal - normalizedAmount > 0.009
+    const isOutstanding = subtotal - normalizedAmount > 0.009;
 
     if (isOutstanding && !customer) {
-      toast.error(
-        "Select a customer for credit or partial payment",
-      )
-      return
+      toast.error("Select a customer for credit or partial payment");
+      return;
     }
 
-    setSaving(true)
+    setIsConfirmOpen(true);
+  };
+
+  const executeSaveSale = async () => {
+    setIsConfirmOpen(false);
+    setSaving(true);
+
+    const amount = Number(paidAmount);
+    const normalizedAmount =
+      Math.abs(amount - subtotal) <= 0.009 ? subtotal : amount;
 
     try {
-      await PosSaleService.create({
+      const saleResult = await PosSaleService.create({
         customer_id: customer?.id ?? null,
         paid_amount: normalizedAmount,
         items: items.map((item) => ({
@@ -164,42 +157,69 @@ export function OrderSummary({
           quantity: item.qty,
           unit_price: item.price,
         })),
-      })
+      });
 
-      clear()
-      setCustomer(null)
-      setPaymentMode("paid")
-      setPaidAmount("")
+      // Fetch business settings for receipt header details
+      const settings = await PosSettingsService.get().catch(() => null);
 
-      await refetchData?.()
+      // Auto-generate & download PDF receipt
+      try {
+        generatePosReceiptPDF({
+          shopName: settings?.shop_name || "Perfect Traders",
+          shopAddress: settings?.address || "Suraj Miani Road, Multan",
+          shopPhone: settings?.phone || "03134640267",
+          receiptNumber:
+            (saleResult as any)?.receipt_number ||
+            `PT-${Date.now().toString().slice(-4)}`,
+          dateTime: new Date().toLocaleString("en-PK"),
+          customerName: customer?.name || "Walk-in Customer",
+          items: items.map((i) => ({
+            name: i.name,
+            quantity: i.qty,
+            unit_price: i.price,
+            line_total: i.qty * i.price,
+          })),
+          itemCount: items.length,
+          unitCount: items.reduce((sum, i) => sum + i.qty, 0),
+          grandTotal: subtotal,
+          paidAmount: normalizedAmount,
+          remainingAmount: Math.max(subtotal - normalizedAmount, 0),
+          paymentStatus: paymentMode,
+          paymentMode:
+            paymentMode.charAt(0).toUpperCase() + paymentMode.slice(1),
+          currency: settings?.currency || "PKR",
+        });
+      } catch (pdfErr) {
+        console.error("PDF receipt generation error:", pdfErr);
+      }
 
-      setSuccess(true)
-      toast.success("Sale saved successfully")
+      clear();
+      setCustomer(null);
+      setPaymentMode("paid");
+      setPaidAmount("");
 
-      window.setTimeout(
-        () => setSuccess(false),
-        1500,
-      )
+      await refetchData?.();
+
+      setSuccess(true);
+      toast.success("Sale saved and receipt generated");
+
+      window.setTimeout(() => setSuccess(false), 1500);
     } catch (error) {
-      console.error("Failed to save sale:", error)
+      console.error("Failed to save sale:", error);
 
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to save sale",
-      )
+        error instanceof Error ? error.message : "Failed to save sale",
+      );
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   return (
     <aside className="pos-panel w-96 shrink-0 p-4 flex flex-col gap-4 h-full">
       <header className="flex items-center gap-2 shrink-0 pb-2 border-b border-[var(--pos-stroke)]">
         <ShoppingBag className="w-4 h-4 text-[var(--pos-brand-text)]" />
-        <span className="text-sm font-semibold">
-          New Sale
-        </span>
+        <span className="text-sm font-semibold">New Sale</span>
       </header>
 
       <div className="shrink-0">
@@ -235,10 +255,7 @@ export function OrderSummary({
           <div className="flex-1 overflow-y-auto scrollbar-thin pr-1 min-h-0">
             <div className="grid gap-3">
               {items.map((item, index) => (
-                <div
-                  key={item.id}
-                  className="pos-panel rounded-xl p-3"
-                >
+                <div key={item.id} className="pos-panel rounded-xl p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="pos-panel h-6 w-6 shrink-0 rounded-full grid place-items-center text-xs font-medium">
@@ -265,7 +282,6 @@ export function OrderSummary({
                   <div className="grid grid-cols-2 gap-2 mt-3">
                     <label className="text-xs text-muted-foreground">
                       Selling price
-
                       <div className="relative mt-1">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs">
                           Rs.
@@ -277,16 +293,12 @@ export function OrderSummary({
                           step="0.01"
                           value={item.price || ""}
                           onChange={(event) => {
-                            const value = Number(
-                              event.target.value,
-                            )
+                            const value = Number(event.target.value);
 
                             setPrice(
                               item.id,
-                              Number.isFinite(value)
-                                ? value
-                                : 0,
-                            )
+                              Number.isFinite(value) ? value : 0,
+                            );
                           }}
                           className="w-full bg-foreground/5 border border-foreground/10 rounded-lg pl-9 pr-2 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand"
                         />
@@ -295,7 +307,6 @@ export function OrderSummary({
 
                     <label className="text-xs text-muted-foreground">
                       Quantity
-
                       <div className="mt-1 flex items-center gap-1">
                         <button
                           type="button"
@@ -312,12 +323,10 @@ export function OrderSummary({
                           step="1"
                           value={item.qty}
                           onChange={(event) => {
-                            const value = Number(
-                              event.target.value,
-                            )
+                            const value = Number(event.target.value);
 
                             if (Number.isFinite(value)) {
-                              setQty(item.id, value)
+                              setQty(item.id, value);
                             }
                           }}
                           className="w-full bg-foreground/5 border border-foreground/10 rounded-lg px-2 py-2 text-center text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand"
@@ -353,9 +362,7 @@ export function OrderSummary({
           <div className="shrink-0 space-y-4">
             <div className="pos-panel rounded-xl p-4 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="font-medium">
-                  Grand Total
-                </span>
+                <span className="font-medium">Grand Total</span>
 
                 <span className="text-xl font-bold">
                   Rs.{subtotal.toFixed(2)}
@@ -363,16 +370,12 @@ export function OrderSummary({
               </div>
 
               <div>
-                <label className="text-xs text-muted-foreground">
-                  Payment
-                </label>
+                <label className="text-xs text-muted-foreground">Payment</label>
 
                 <div className="grid grid-cols-3 gap-2 mt-2">
                   <button
                     type="button"
-                    onClick={() =>
-                      selectPaymentMode("paid")
-                    }
+                    onClick={() => selectPaymentMode("paid")}
                     className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${
                       paymentMode === "paid"
                         ? "bg-pos-brand text-black"
@@ -384,9 +387,7 @@ export function OrderSummary({
 
                   <button
                     type="button"
-                    onClick={() =>
-                      selectPaymentMode("partial")
-                    }
+                    onClick={() => selectPaymentMode("partial")}
                     className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${
                       paymentMode === "partial"
                         ? "bg-pos-brand text-black"
@@ -398,9 +399,7 @@ export function OrderSummary({
 
                   <button
                     type="button"
-                    onClick={() =>
-                      selectPaymentMode("credit")
-                    }
+                    onClick={() => selectPaymentMode("credit")}
                     className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${
                       paymentMode === "credit"
                         ? "bg-pos-brand text-black"
@@ -433,9 +432,7 @@ export function OrderSummary({
                     step="0.01"
                     value={paidAmount}
                     onChange={(event) =>
-                      handlePaidAmountChange(
-                        event.target.value,
-                      )
+                      handlePaidAmountChange(event.target.value)
                     }
                     className="w-full bg-foreground/5 border border-foreground/10 rounded-lg pl-9 pr-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand"
                     aria-label="Paid amount"
@@ -444,9 +441,7 @@ export function OrderSummary({
               </div>
 
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  Remaining
-                </span>
+                <span className="text-muted-foreground">Remaining</span>
 
                 <span
                   className={
@@ -462,15 +457,14 @@ export function OrderSummary({
 
               {remaining > 0.009 && !customer && (
                 <p className="text-xs text-amber-500">
-                  Select a customer to save a credit or
-                  partial payment.
+                  Select a customer to save a credit or partial payment.
                 </p>
               )}
             </div>
 
             <button
               type="button"
-              onClick={handleSaveSale}
+              onClick={handleValidateAndPrompt}
               disabled={saving || success}
               className={`w-full rounded-full py-3 font-medium transition flex items-center justify-center gap-2 ${
                 success
@@ -486,15 +480,94 @@ export function OrderSummary({
               ) : (
                 <>
                   <User size={18} />
-                  {saving
-                    ? "Saving..."
-                    : "Complete Sale"}
+                  {saving ? "Saving..." : "Complete Sale"}
                 </>
               )}
             </button>
           </div>
         </>
       )}
+
+      <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Sale</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please verify the sale details before final confirmation.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-3 py-2 text-sm">
+            <div className="flex justify-between border-b pb-2 text-xs">
+              <span className="text-muted-foreground">Customer:</span>
+              <span className="font-semibold text-foreground">
+                {customer?.name || "Walk-in Customer"}
+              </span>
+            </div>
+
+            <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 divide-y divide-foreground/5">
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex justify-between text-xs pt-1.5 first:pt-0"
+                >
+                  <div className="min-w-0 pr-2">
+                    <p className="font-medium truncate">{item.name}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {item.qty} × Rs. {item.price.toFixed(2)}
+                    </p>
+                  </div>
+                  <span className="font-semibold shrink-0">
+                    Rs. {(item.price * item.qty).toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t border-[var(--pos-stroke)] pt-2.5 space-y-1.5 text-xs">
+              <div className="flex justify-between font-bold text-sm">
+                <span>Total Amount:</span>
+                <span>Rs. {subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Payment Method:</span>
+                <span className="capitalize font-semibold text-foreground">
+                  {paymentMode}
+                </span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Amount Paid:</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  Rs. {(Number(paidAmount) || 0).toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Remaining Balance:</span>
+                <span
+                  className={
+                    remaining > 0.009
+                      ? "font-semibold text-amber-500"
+                      : "font-semibold text-emerald-500"
+                  }
+                >
+                  Rs. {Math.max(remaining, 0).toFixed(2)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeSaveSale}
+              disabled={saving}
+              className="bg-[var(--pos-brand)] text-black hover:opacity-90 font-semibold"
+            >
+              {saving ? "Saving..." : "Confirm & Print"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </aside>
-  )
+  );
 }

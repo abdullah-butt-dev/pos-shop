@@ -1,12 +1,29 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { Loader2, PackageCheck, Plus, Trash2, Truck, Wallet } from "lucide-react"
-import { toast } from "sonner"
-import { Sidebar } from "@/components/pos/sidebar"
-import { AutocompleteField, type AutocompleteOption } from "@/components/purchases/autocomplete-field"
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Loader2, PackageCheck, Plus, Trash2, Truck } from "lucide-react";
+import { toast } from "sonner";
+import { NavHeader } from "@/components/pos/nav-header";
+import {
+  AutocompleteField,
+  type AutocompleteOption,
+} from "@/components/purchases/autocomplete-field";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   PosInventoryService,
   PosProductService,
@@ -14,111 +31,114 @@ import {
   PosSupplierService,
   type PosInventoryRow,
   type PosPurchaseWithRelations,
-} from "@/lib/pos-service"
-import { cn } from "@/lib/utils"
+} from "@/lib/pos-service";
+import { cn } from "@/lib/utils";
 
 interface LineItem {
-  key: string
-  product: AutocompleteOption | null
-  quantity: string
-  unitCost: string
+  key: string;
+  product: AutocompleteOption | null;
+  quantity: string;
+  unitCost: string;
 }
 
 function emptyLineItem(): LineItem {
-  return { key: crypto.randomUUID(), product: null, quantity: "", unitCost: "" }
+  return {
+    key: crypto.randomUUID(),
+    product: null,
+    quantity: "",
+    unitCost: "",
+  };
 }
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  return new Date().toISOString().slice(0, 10);
 }
 
 function formatMoney(value: number) {
-  return `Rs. ${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+  return `Rs. ${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
 export default function PurchasesPage() {
-  const [supplier, setSupplier] = useState<AutocompleteOption | null>(null)
-  const [purchaseDate, setPurchaseDate] = useState(todayISO)
-  const [referenceNumber, setReferenceNumber] = useState("")
-  const [notes, setNotes] = useState("")
-  const [lineItems, setLineItems] = useState<LineItem[]>([emptyLineItem()])
-  const [amountPaid, setAmountPaid] = useState("")
-  const [paymentMethod, setPaymentMethod] = useState("")
-  const [submitting, setSubmitting] = useState(false)
+  const [supplier, setSupplier] = useState<AutocompleteOption | null>(null);
+  const [purchaseDate, setPurchaseDate] = useState(todayISO);
+  const [lineItems, setLineItems] = useState<LineItem[]>([emptyLineItem()]);
+  const [amountPaid, setAmountPaid] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const [purchases, setPurchases] = useState<PosPurchaseWithRelations[]>([])
-  const [purchasesLoading, setPurchasesLoading] = useState(true)
-  const [inventory, setInventory] = useState<PosInventoryRow[]>([])
+  const [purchases, setPurchases] = useState<PosPurchaseWithRelations[]>([]);
+  const [purchasesLoading, setPurchasesLoading] = useState(true);
+  const [inventory, setInventory] = useState<PosInventoryRow[]>([]);
 
   const loadPurchases = useCallback(async () => {
-    setPurchasesLoading(true)
-    const data = await PosPurchaseService.list()
-    setPurchases(data)
-    setPurchasesLoading(false)
-  }, [])
+    setPurchasesLoading(true);
+    const data = await PosPurchaseService.list();
+    setPurchases(data);
+    setPurchasesLoading(false);
+  }, []);
 
   const loadInventory = useCallback(async () => {
-    const data = await PosInventoryService.list()
-    setInventory(data)
-  }, [])
+    const data = await PosInventoryService.list();
+    setInventory(data);
+  }, []);
 
   useEffect(() => {
-    loadPurchases()
-    loadInventory()
-  }, [loadPurchases, loadInventory])
+    loadPurchases();
+    loadInventory();
+  }, [loadPurchases, loadInventory]);
 
   const total = useMemo(
     () =>
       lineItems.reduce((sum, li) => {
-        const qty = Number(li.quantity) || 0
-        const cost = Number(li.unitCost) || 0
-        return sum + qty * cost
+        const qty = Number(li.quantity) || 0;
+        const cost = Number(li.unitCost) || 0;
+        return sum + qty * cost;
       }, 0),
     [lineItems],
-  )
-
-  const supplierBalances = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; due: number }>()
-    for (const p of purchases) {
-      const existing = map.get(p.supplier_id) || {
-        id: p.supplier_id,
-        name: p.pos_suppliers?.name || "Unknown",
-        due: 0,
-      }
-      existing.due += Number(p.amount_due) || 0
-      map.set(p.supplier_id, existing)
-    }
-    return Array.from(map.values()).filter((s) => s.due > 0.009)
-  }, [purchases])
+  );
 
   function updateLineItem(key: string, patch: Partial<LineItem>) {
-    setLineItems((prev) => prev.map((li) => (li.key === key ? { ...li, ...patch } : li)))
+    setLineItems((prev) =>
+      prev.map((li) => (li.key === key ? { ...li, ...patch } : li)),
+    );
   }
 
   function addLineItem() {
-    setLineItems((prev) => [...prev, emptyLineItem()])
+    setLineItems((prev) => [...prev, emptyLineItem()]);
   }
 
   function removeLineItem(key: string) {
-    setLineItems((prev) => (prev.length > 1 ? prev.filter((li) => li.key !== key) : prev))
+    setLineItems((prev) =>
+      prev.length > 1 ? prev.filter((li) => li.key !== key) : prev,
+    );
   }
 
   function resetForm() {
-    setSupplier(null)
-    setPurchaseDate(todayISO())
-    setReferenceNumber("")
-    setNotes("")
-    setLineItems([emptyLineItem()])
-    setAmountPaid("")
-    setPaymentMethod("")
+    setSupplier(null);
+    setPurchaseDate(todayISO());
+    setLineItems([emptyLineItem()]);
+    setAmountPaid("");
+    setPaymentMethod("");
+  }
+
+  // Auto-set amount paid based on payment mode
+  function handlePaymentMethodChange(method: string) {
+    setPaymentMethod(method);
+    if (method === "Paid") {
+      setAmountPaid(String(total));
+    } else if (method === "Credit") {
+      setAmountPaid("0");
+    }
+    // For "Partial", let user enter manually
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!supplier) {
-      toast.error("Select a supplier from the list, or add a new one")
-      return
+      toast.error("Select a supplier from the list, or add a new one");
+      return;
     }
 
     const items = lineItems
@@ -127,368 +147,472 @@ export default function PurchasesPage() {
         product_id: li.product!.id,
         quantity: Number(li.quantity),
         unit_cost: Number(li.unitCost) || 0,
-      }))
+      }));
 
     if (items.length === 0) {
-      toast.error("Add at least one product with a quantity greater than 0")
-      return
+      toast.error("Add at least one product with a quantity greater than 0");
+      return;
     }
 
-    setSubmitting(true)
+    setSubmitting(true);
     try {
       const result = await PosPurchaseService.create({
         supplier_id: supplier.id,
         purchase_date: purchaseDate,
-        reference_number: referenceNumber.trim() || undefined,
-        notes: notes.trim() || undefined,
         items,
         amount_paid: Number(amountPaid) || 0,
         payment_method: paymentMethod.trim() || undefined,
-      })
+      });
 
       if (!result) {
-        toast.error("Failed to save purchase. Please try again.")
-        return
+        toast.error("Failed to save purchase. Please try again.");
+        return;
       }
 
-      toast.success("Purchase saved")
-      resetForm()
-      loadPurchases()
-      loadInventory()
+      toast.success("Purchase saved");
+      resetForm();
+      setDialogOpen(false);
+      loadPurchases();
+      loadInventory();
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
   }
 
   return (
-    <main className="h-full w-full flex flex-col overflow-hidden">
-      <div className="flex-1 flex flex-col p-3 gap-3 overflow-hidden">
-        <div className="pos-panel flex-1 flex overflow-hidden">
-          <div className="flex gap-3 flex-1 overflow-hidden">
-            <Sidebar />
-            <section className="flex-1 flex flex-col gap-4 overflow-y-auto p-4">
-              <div>
-                <h1 className="text-2xl font-bold">Purchase Entry</h1>
-                <p className="text-sm text-muted-foreground">Record stock purchases from suppliers</p>
-              </div>
+    <main className="h-full w-full flex flex-col overflow-hidden bg-[var(--pos-panel-2)] text-foreground">
+      <NavHeader />
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto px-4 py-5 space-y-5">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h1 className="text-2xl font-bold">Inventory / Purchases</h1>
+              <p className="text-sm text-muted-foreground">
+                Record stock purchases from suppliers
+              </p>
+            </div>
 
-              <form onSubmit={handleSubmit} className="pos-panel p-4 rounded-lg flex flex-col gap-5">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <AutocompleteField
-                    id="supplier"
-                    label="Supplier"
-                    placeholder="Type supplier name"
-                    value={supplier}
-                    onChange={setSupplier}
-                    searchFn={PosSupplierService.search}
-                    createFn={PosSupplierService.create}
-                  />
-                  <div>
-                    <label
-                      htmlFor="purchase-date"
-                      className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2"
-                    >
-                      Purchase Date
-                    </label>
-                    <input
-                      id="purchase-date"
-                      type="date"
-                      value={purchaseDate}
-                      onChange={(e) => setPurchaseDate(e.target.value)}
-                      required
-                      className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <button className="flex items-center gap-2 px-4 py-2.5 bg-pos-brand text-black font-bold rounded-xl active:scale-[0.98] transition cursor-pointer shadow-sm hover:opacity-90">
+                  <Plus className="w-4 h-4" />
+                  Add Purchase
+                </button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-[var(--pos-panel)]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Truck className="w-5 h-5" />
+                    New Purchase
+                  </DialogTitle>
+                </DialogHeader>
+
+                <form
+                  onSubmit={handleSubmit}
+                  className="flex flex-col gap-5 pt-2"
+                >
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <AutocompleteField
+                      id="supplier"
+                      label="Supplier"
+                      placeholder="Type supplier name"
+                      value={supplier}
+                      onChange={setSupplier}
+                      searchFn={PosSupplierService.search}
+                      createFn={PosSupplierService.create}
                     />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label
-                      htmlFor="ref-number"
-                      className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2"
-                    >
-                      Reference # (optional)
-                    </label>
-                    <input
-                      id="ref-number"
-                      type="text"
-                      value={referenceNumber}
-                      onChange={(e) => setReferenceNumber(e.target.value)}
-                      placeholder="e.g. Invoice #"
-                      className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="notes"
-                      className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2"
-                    >
-                      Notes (optional)
-                    </label>
-                    <input
-                      id="notes"
-                      type="text"
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Optional note"
-                      className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Products
-                    </span>
-                    <button
-                      type="button"
-                      onClick={addLineItem}
-                      className="text-xs font-semibold text-[var(--pos-brand-text)] flex items-center gap-1 hover:opacity-80"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Add product
-                    </button>
-                  </div>
-
-                  {lineItems.map((li, idx) => {
-                    const qty = Number(li.quantity) || 0
-                    const cost = Number(li.unitCost) || 0
-                    return (
-                      <div
-                        key={li.key}
-                        className="grid gap-3 sm:grid-cols-[1fr_100px_120px_110px_auto] items-end p-3 rounded-xl bg-foreground/[0.02] border border-[var(--pos-stroke)]"
+                    <div>
+                      <label
+                        htmlFor="purchase-date"
+                        className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2"
                       >
-                        <AutocompleteField
-                          label={idx === 0 ? "Product" : undefined}
-                          placeholder="Type product name"
-                          value={li.product}
-                          onChange={(option) => updateLineItem(li.key, { product: option })}
-                          searchFn={PosProductService.search}
-                          createFn={PosProductService.create}
-                        />
-                        <div>
-                          {idx === 0 && (
-                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
+                        Purchase Date
+                      </label>
+                      <input
+                        id="purchase-date"
+                        type="date"
+                        value={purchaseDate}
+                        onChange={(e) => setPurchaseDate(e.target.value)}
+                        required
+                        className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Products
+                      </span>
+                      <button
+                        type="button"
+                        onClick={addLineItem}
+                        className="text-xs font-semibold text-[var(--pos-brand-text)] flex items-center gap-1 hover:opacity-80"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add product
+                      </button>
+                    </div>
+
+                    {lineItems.map((li, idx) => {
+                      const qty = Number(li.quantity) || 0;
+                      const cost = Number(li.unitCost) || 0;
+                      return (
+                        <div
+                          key={li.key}
+                          className="grid gap-3 sm:grid-cols-[1fr_100px_120px_110px_auto] items-end p-3 rounded-xl bg-foreground/[0.02] border border-[var(--pos-stroke)]"
+                        >
+                          <div className="flex flex-col gap-2">
+                            <label
+                              className={cn(
+                                "text-xs font-semibold text-muted-foreground uppercase tracking-wider",
+                                idx === 0 ? "block" : "block sm:hidden",
+                              )}
+                            >
+                              Product
+                            </label>
+                            <AutocompleteField
+                              placeholder="Type product name"
+                              value={li.product}
+                              onChange={(option) =>
+                                updateLineItem(li.key, { product: option })
+                              }
+                              searchFn={PosProductService.search}
+                              createFn={PosProductService.create}
+                            />
+                          </div>
+                          <div>
+                            <label
+                              className={cn(
+                                "text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2",
+                                idx === 0 ? "block" : "block sm:hidden",
+                              )}
+                            >
                               Qty
                             </label>
-                          )}
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={li.quantity}
-                            onChange={(e) => updateLineItem(li.key, { quantity: e.target.value })}
-                            placeholder="0"
-                            className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
-                          />
-                        </div>
-                        <div>
-                          {idx === 0 && (
-                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={li.quantity}
+                              onChange={(e) =>
+                                updateLineItem(li.key, {
+                                  quantity: e.target.value,
+                                })
+                              }
+                              placeholder="0"
+                              className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
+                            />
+                          </div>
+                          <div>
+                            <label
+                              className={cn(
+                                "text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2",
+                                idx === 0 ? "block" : "block sm:hidden",
+                              )}
+                            >
                               Cost/unit
                             </label>
-                          )}
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={li.unitCost}
-                            onChange={(e) => updateLineItem(li.key, { unitCost: e.target.value })}
-                            placeholder="0.00"
-                            className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
-                          />
-                        </div>
-                        <div>
-                          {idx === 0 && (
-                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={li.unitCost}
+                              onChange={(e) =>
+                                updateLineItem(li.key, {
+                                  unitCost: e.target.value,
+                                })
+                              }
+                              placeholder="0.00"
+                              className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
+                            />
+                          </div>
+                          <div>
+                            <label
+                              className={cn(
+                                "text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2",
+                                idx === 0 ? "block" : "block sm:hidden",
+                              )}
+                            >
                               Line total
                             </label>
-                          )}
-                          <div className="px-3 py-2.5 text-sm font-semibold text-foreground/80 truncate">
-                            {formatMoney(qty * cost)}
+                            <div className="px-3 py-2.5 text-sm font-semibold text-foreground/80 truncate">
+                              {formatMoney(qty * cost)}
+                            </div>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => removeLineItem(li.key)}
+                            disabled={lineItems.length === 1}
+                            className="p-2.5 text-red-600 dark:text-red-400 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 rounded-xl transition disabled:opacity-30 disabled:cursor-not-allowed w-full sm:w-auto flex justify-center mt-2 sm:mt-0"
+                            title="Remove product"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removeLineItem(li.key)}
-                          disabled={lineItems.length === 1}
-                          className="p-2.5 text-red-600 dark:text-red-400 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 rounded-xl transition disabled:opacity-30 disabled:cursor-not-allowed"
-                          title="Remove product"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-3 items-end">
+                    <div className="sm:col-span-2">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
+                        Payment Mode
+                      </label>
+                      <div className="flex gap-2">
+                        <TooltipProvider delayDuration={300}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handlePaymentMethodChange("Paid")
+                                }
+                                className={cn(
+                                  "flex-1 px-3 py-2.5 text-sm font-semibold rounded-xl border transition-colors",
+                                  paymentMethod === "Paid"
+                                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                    : "bg-foreground/5 border-foreground/10 text-muted-foreground hover:bg-foreground/10",
+                                )}
+                              >
+                                Paid
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <p className="text-sm">
+                                Full amount paid upfront
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handlePaymentMethodChange("Partial")
+                                }
+                                className={cn(
+                                  "flex-1 px-3 py-2.5 text-sm font-semibold rounded-xl border transition-colors",
+                                  paymentMethod === "Partial"
+                                    ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                                    : "bg-foreground/5 border-foreground/10 text-muted-foreground hover:bg-foreground/10",
+                                )}
+                              >
+                                Partial
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <p className="text-sm">
+                                Part of the amount paid now, rest owed
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handlePaymentMethodChange("Credit")
+                                }
+                                className={cn(
+                                  "flex-1 px-3 py-2.5 text-sm font-semibold rounded-xl border transition-colors",
+                                  paymentMethod === "Credit"
+                                    ? "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400"
+                                    : "bg-foreground/5 border-foreground/10 text-muted-foreground hover:bg-foreground/10",
+                                )}
+                              >
+                                Credit
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <p className="text-sm">
+                                No payment made, full amount owed to supplier
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
-                    )
-                  })}
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-3 items-end">
-                  <div>
-                    <label
-                      htmlFor="amount-paid"
-                      className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2"
-                    >
-                      Amount Paid (Rs)
-                    </label>
-                    <input
-                      id="amount-paid"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={amountPaid}
-                      onChange={(e) => setAmountPaid(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
-                    />
+                    </div>
+                    <div className="sm:text-right">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
+                        Purchase Total
+                      </p>
+                      <p className="text-xl font-bold">{formatMoney(total)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <label
-                      htmlFor="payment-method"
-                      className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2"
-                    >
-                      Payment Method (optional)
-                    </label>
-                    <input
-                      id="payment-method"
-                      type="text"
-                      value={paymentMethod}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      placeholder="e.g. Cash, Bank transfer"
-                      className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
-                    />
-                  </div>
-                  <div className="sm:text-right">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
-                      Purchase Total
-                    </p>
-                    <p className="text-xl font-bold">{formatMoney(total)}</p>
-                  </div>
-                </div>
 
-                <div className="flex justify-end pt-2 border-t border-[var(--pos-stroke)]">
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="px-6 py-3 rounded-xl bg-pos-brand text-black text-sm font-bold transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-[var(--pos-brand)]/10 flex items-center gap-2"
-                  >
-                    {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                    Save Purchase
-                  </button>
-                </div>
-              </form>
-
-              <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
-                <div className="pos-panel rounded-lg p-4 flex flex-col gap-3 min-w-0">
-                  <h2 className="text-sm font-bold flex items-center gap-2">
-                    <Truck className="w-4 h-4" /> Recent Purchases
-                  </h2>
-                  {purchasesLoading ? (
-                    <p className="text-sm text-muted-foreground">Loading...</p>
-                  ) : purchases.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No purchases yet.</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider border-b border-[var(--pos-stroke)]">
-                            <th className="py-2 pr-3">Date</th>
-                            <th className="py-2 pr-3">Supplier</th>
-                            <th className="py-2 pr-3">Items</th>
-                            <th className="py-2 pr-3 text-right">Total</th>
-                            <th className="py-2 pr-3 text-right">Paid</th>
-                            <th className="py-2 pr-3 text-right">Due</th>
-                            <th className="py-2 text-right">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {purchases.map((p) => (
-                            <tr key={p.id} className="border-b border-[var(--pos-stroke)]/50 align-top">
-                              <td className="py-2 pr-3 whitespace-nowrap">{p.purchase_date}</td>
-                              <td className="py-2 pr-3 whitespace-nowrap">{p.pos_suppliers?.name || "—"}</td>
-                              <td className="py-2 pr-3">
-                                <ul className="space-y-0.5">
-                                  {p.pos_purchase_items.map((it) => (
-                                    <li key={it.id} className="text-xs text-muted-foreground whitespace-nowrap">
-                                      {it.pos_products?.name || "—"} × {it.quantity} @ Rs.{it.unit_cost}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </td>
-                              <td className="py-2 pr-3 text-right whitespace-nowrap">
-                                {formatMoney(Number(p.total_amount) || 0)}
-                              </td>
-                              <td className="py-2 pr-3 text-right whitespace-nowrap">
-                                {formatMoney(Number(p.amount_paid) || 0)}
-                              </td>
-                              <td className="py-2 pr-3 text-right whitespace-nowrap">
-                                {formatMoney(Number(p.amount_due) || 0)}
-                              </td>
-                              <td className="py-2 text-right whitespace-nowrap">
-                                <span
-                                  className={cn(
-                                    "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase",
-                                    p.payment_status === "paid" && "bg-emerald-500/10 text-emerald-500",
-                                    p.payment_status === "partial" && "bg-amber-500/10 text-amber-500",
-                                    p.payment_status === "unpaid" && "bg-red-500/10 text-red-500",
-                                  )}
-                                >
-                                  {p.payment_status}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  {/* Amount Paid — only for Partial */}
+                  {paymentMethod === "Partial" && (
+                    <div>
+                      <label
+                        htmlFor="amount-paid"
+                        className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2"
+                      >
+                        Amount Paid (Rs)
+                      </label>
+                      <input
+                        id="amount-paid"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={amountPaid}
+                        onChange={(e) => setAmountPaid(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
+                      />
                     </div>
                   )}
-                </div>
 
-                <div className="flex flex-col gap-4 min-w-0">
-                  <div className="pos-panel rounded-lg p-4 flex flex-col gap-3">
-                    <h2 className="text-sm font-bold flex items-center gap-2">
-                      <PackageCheck className="w-4 h-4" /> Current Stock
-                    </h2>
-                    {inventory.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No stock yet.</p>
-                    ) : (
-                      <ul className="flex flex-col gap-1.5 max-h-64 overflow-y-auto">
-                        {inventory.map((inv) => (
-                          <li key={inv.product_id} className="flex justify-between gap-3 text-sm">
-                            <span className="text-foreground/80 truncate">{inv.pos_products?.name || "—"}</span>
-                            <span className="font-semibold whitespace-nowrap">
-                              {inv.quantity} {inv.pos_products?.unit}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                  <div className="flex justify-end pt-2 border-t border-[var(--pos-stroke)]">
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="px-6 py-3 rounded-xl bg-pos-brand text-black text-sm font-bold transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-[var(--pos-brand)]/10 flex items-center gap-2"
+                    >
+                      {submitting && (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      )}
+                      Save Purchase
+                    </button>
                   </div>
-
-                  <div className="pos-panel rounded-lg p-4 flex flex-col gap-3">
-                    <h2 className="text-sm font-bold flex items-center gap-2">
-                      <Wallet className="w-4 h-4" /> Supplier Balances
-                    </h2>
-                    {supplierBalances.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">All suppliers settled.</p>
-                    ) : (
-                      <ul className="flex flex-col gap-1.5">
-                        {supplierBalances.map((s) => (
-                          <li key={s.id} className="flex justify-between gap-3 text-sm">
-                            <span className="text-foreground/80 truncate">{s.name}</span>
-                            <span className="font-semibold text-amber-500 whitespace-nowrap">
-                              {formatMoney(s.due)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </section>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
+
+          {/* Two Tab Layout: Current Stock + Recent Purchases */}
+          <Tabs defaultValue="stock" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="stock">
+                <PackageCheck className="w-4 h-4 mr-1.5" />
+                Current Stock
+              </TabsTrigger>
+              <TabsTrigger value="purchases">
+                <Truck className="w-4 h-4 mr-1.5" />
+                Recent Purchases
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="stock">
+              <div className="pos-panel rounded-lg p-4">
+                {inventory.length === 0 ? (
+                  <div className="text-center py-8">
+                    <PackageCheck className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+                    <p className="text-sm text-muted-foreground">
+                      No stock yet. Add purchases to build inventory.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {inventory.map((inv) => (
+                      <div
+                        key={inv.product_id}
+                        className="p-3 rounded-lg bg-foreground/[0.02] border border-[var(--pos-stroke)] flex flex-col gap-1"
+                      >
+                        <span className="text-sm font-semibold truncate">
+                          {inv.pos_products?.name || "—"}
+                        </span>
+                        <span className="text-2xl font-bold text-[var(--pos-brand-text)]">
+                          {inv.quantity}{" "}
+                          <span className="text-xs text-muted-foreground font-normal">
+                            {inv.pos_products?.unit}
+                          </span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="purchases">
+              <div className="pos-panel rounded-lg p-4">
+                {purchasesLoading ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Loading...
+                  </p>
+                ) : purchases.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Truck className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+                    <p className="text-sm text-muted-foreground">
+                      No purchases yet.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider border-b border-[var(--pos-stroke)]">
+                          <th className="py-2 pr-3">Date</th>
+                          <th className="py-2 pr-3">Supplier</th>
+                          <th className="py-2 pr-3">Items</th>
+                          <th className="py-2 pr-3 text-right">Total</th>
+                          <th className="py-2 pr-3 text-right">Paid</th>
+                          <th className="py-2 pr-3 text-right">Due</th>
+                          <th className="py-2 text-right">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {purchases.map((p) => (
+                          <tr
+                            key={p.id}
+                            className="border-b border-[var(--pos-stroke)]/50 align-top"
+                          >
+                            <td className="py-2 pr-3 whitespace-nowrap">
+                              {p.purchase_date}
+                            </td>
+                            <td className="py-2 pr-3 whitespace-nowrap">
+                              {p.pos_suppliers?.name || "—"}
+                            </td>
+                            <td className="py-2 pr-3">
+                              <ul className="space-y-0.5">
+                                {p.pos_purchase_items.map((it) => (
+                                  <li
+                                    key={it.id}
+                                    className="text-xs text-muted-foreground whitespace-nowrap"
+                                  >
+                                    {it.pos_products?.name || "—"} ×{" "}
+                                    {it.quantity} @ Rs.{it.unit_cost}
+                                  </li>
+                                ))}
+                              </ul>
+                            </td>
+                            <td className="py-2 pr-3 text-right whitespace-nowrap">
+                              {formatMoney(Number(p.total_amount) || 0)}
+                            </td>
+                            <td className="py-2 pr-3 text-right whitespace-nowrap">
+                              {formatMoney(Number(p.amount_paid) || 0)}
+                            </td>
+                            <td className="py-2 pr-3 text-right whitespace-nowrap">
+                              {formatMoney(Number(p.amount_due) || 0)}
+                            </td>
+                            <td className="py-2 text-right whitespace-nowrap">
+                              <span
+                                className={cn(
+                                  "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase",
+                                  p.payment_status === "paid" &&
+                                    "bg-emerald-500/10 text-emerald-500",
+                                  p.payment_status === "partial" &&
+                                    "bg-amber-500/10 text-amber-500",
+                                  p.payment_status === "unpaid" &&
+                                    "bg-red-500/10 text-red-500",
+                                )}
+                              >
+                                {p.payment_status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </main>
-  )
+  );
 }

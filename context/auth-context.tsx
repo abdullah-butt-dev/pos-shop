@@ -11,7 +11,7 @@ import { useRouter, usePathname } from "next/navigation"
 // are configured — it is not a role or multi-account system.
 const mockUser: User = {
   id: "00000000-0000-0000-0000-000000000000",
-  email: "guest@ssgstore.com",
+  email: "owner@perfecttraders.com",
   app_metadata: {},
   user_metadata: {
     full_name: "Owner",
@@ -23,13 +23,13 @@ const mockUser: User = {
 const getPersistedMockUser = (): User => {
   if (typeof window === 'undefined') return mockUser
   try {
-    const savedName = localStorage.getItem('ssg_mock_cashier_name')
+    const savedName = localStorage.getItem('pt_owner_name')
     if (savedName) {
-      // Strip legacy bracket role suffix e.g. "Divyansh (Owner)" -> "Divyansh"
+      // Strip legacy bracket role suffix
       const cleanName = savedName.replace(/\s*\([^)]+\)\s*$/, '').trim()
       // Persist the cleaned name back to remove old format
       if (cleanName !== savedName) {
-        localStorage.setItem('ssg_mock_cashier_name', cleanName)
+        localStorage.setItem('pt_owner_name', cleanName)
       }
       return {
         ...mockUser,
@@ -132,7 +132,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (loading) return
 
     if (user && pathname === "/login") {
-      router.push("/orders")
+      router.push("/")
     }
   }, [user, loading, pathname, router])
 
@@ -140,7 +140,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setLoading(true)
     try {
       await supabase.auth.signOut()
-      router.push("/orders")
+      router.push("/")
     } catch (error) {
       console.error("Error signing out:", error)
     } finally {
@@ -158,7 +158,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(data.user)
       }
     } else {
-      localStorage.setItem('ssg_mock_cashier_name', name)
+      localStorage.setItem('pt_owner_name', name)
       setUser(prev => {
         const baseUser = prev || getPersistedMockUser()
         return {
