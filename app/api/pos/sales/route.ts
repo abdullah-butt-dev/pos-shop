@@ -92,7 +92,45 @@ export async function POST(request: Request) {
       }
     }
 
+    // Aggregate requested quantities per product to validate against live stock
+    const productQuantities = new Map<string, number>();
+    for (const item of normalizedItems) {
+      productQuantities.set(
+        item.product_id,
+        (productQuantities.get(item.product_id) || 0) + item.quantity,
+      );
+    }
+
     const supabaseAdmin = getSupabaseAdmin();
+    const productIds = Array.from(productQuantities.keys());
+
+    // Check live stock balance from pos_inventory to prevent stale state
+    const { data: inventoryRows, error: invLookupError } = await supabaseAdmin
+      .from("pos_inventory")
+      .select("product_id, quantity")
+      .in("product_id", productIds);
+
+    if (invLookupError) {
+      console.warn("[API /api/pos/sales] Stock lookup skipped:", invLookupError.message);
+    } else if (inventoryRows) {
+      const inventoryMap = new Map<string, number>();
+      for (const row of inventoryRows) {
+        inventoryMap.set(row.product_id, Number(row.quantity) || 0);
+      }
+
+      for (const [prodId, requestedQty] of productQuantities.entries()) {
+        const liveStock = inventoryMap.get(prodId) ?? 0;
+
+        if (liveStock < requestedQty) {
+          return NextResponse.json(
+            {
+              error: `Insufficient stock available. In stock: ${liveStock}, requested: ${requestedQty}`,
+            },
+            { status: 409 },
+          );
+        }
+      }
+    }
 
     const { data, error } = await supabaseAdmin.rpc("pos_create_sale", {
       p_customer_id: customerId,
@@ -106,10 +144,19 @@ export async function POST(request: Request) {
       const message = error.message || "Failed to create sale";
       const normalizedMessage = message.toLowerCase();
 
+      const isStockError =
+        normalizedMessage.includes("insufficient stock") ||
+        normalizedMessage.includes("pos_inventory_quantity_non_negative") ||
+        normalizedMessage.includes("check constraint");
+
       return NextResponse.json(
-        { error: message },
         {
-          status: normalizedMessage.includes("insufficient stock") ? 409 : 400,
+          error: isStockError
+            ? "Insufficient stock available to complete this sale."
+            : message,
+        },
+        {
+          status: isStockError ? 409 : 400,
         },
       );
     }

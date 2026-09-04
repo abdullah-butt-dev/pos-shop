@@ -374,10 +374,11 @@ export class PosSettingsService {
   static async get(): Promise<PosBusinessSettingsRow | null> {
     try {
       const res = await fetch("/api/pos/settings")
-      const json = await res.json()
+      const text = await res.text()
+      const json = text ? JSON.parse(text) : {}
 
-      if (!res.ok || json.error) {
-        console.error("Error fetching settings:", json.error)
+      if (!res.ok || json?.error) {
+        console.error("Error fetching settings:", json?.error)
         return null
       }
 
@@ -398,10 +399,11 @@ export class PosSettingsService {
         body: JSON.stringify(input),
       })
 
-      const json = await res.json()
+      const text = await res.text()
+      const json = text ? JSON.parse(text) : {}
 
-      if (!res.ok || json.error) {
-        throw new Error(json.error || "Failed to update settings")
+      if (!res.ok || json?.error) {
+        throw new Error(json?.error || "Failed to update settings")
       }
 
       return json.data
@@ -549,11 +551,17 @@ export class PosSaleService {
         body: JSON.stringify(input),
       })
 
-      const json = await res.json()
+      const text = await res.text()
+      let json: any = null
+      try {
+        json = text ? JSON.parse(text) : {}
+      } catch {
+        throw new Error(text || `Server error (${res.status})`)
+      }
 
-      if (!res.ok || json.error) {
+      if (!res.ok || json?.error) {
         throw new Error(
-          json.error || "Failed to create sale",
+          json?.error || `Failed to create sale (${res.status})`,
         )
       }
 

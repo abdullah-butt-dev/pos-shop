@@ -444,6 +444,9 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS pos_create_sale(UUID, JSONB);
+DROP FUNCTION IF EXISTS pos_create_sale(UUID, JSONB, NUMERIC);
+
 CREATE OR REPLACE FUNCTION pos_create_sale(
   p_customer_id  UUID,
   p_items        JSONB,
@@ -453,90 +456,257 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
   v_sale_id       UUID;
-  v_item          JSONB;
-  v_product_id    UUID;
-  v_qty           NUMERIC;
-  v_price         NUMERIC;
   v_sale_item_id  UUID;
-  v_remaining     NUMERIC;
-  v_avail         NUMERIC;
-  v_alloc_qty     NUMERIC;
-  v_pi            RECORD;
-  v_total         NUMERIC := 0;
+  v_product_id    UUID;
+  v_qty           NUMERIC(12,2);
+  v_unit_price    NUMERIC(12,2);
+  v_stock         NUMERIC(12,2);
+  v_remaining     NUMERIC(12,2);
+  v_take          NUMERIC(12,2);
+  v_cost_total    NUMERIC(18,4);
+  v_qty_total     NUMERIC(18,4);
+  v_purchase      RECORD;
+  v_total         NUMERIC(12,2);
+  v_paid          NUMERIC(12,2);
 BEGIN
   IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items) < 1 THEN
     RAISE EXCEPTION 'At least one sale item is required';
   END IF;
 
-  -- Validate stock availability and lock inventory rows
-  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
-  LOOP
-    v_product_id := (v_item ->> 'product_id')::UUID;
-    v_qty := (v_item ->> 'quantity')::NUMERIC;
+  v_paid := COALESCE(p_paid_amount, 0);
+  IF v_paid < 0 THEN
+    RAISE EXCEPTION 'Paid amount must be zero or greater';
+  END IF;
 
-    SELECT quantity INTO v_avail
+  IF p_customer_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM pos_customers WHERE id = p_customer_id
+  ) THEN
+    RAISE EXCEPTION 'Customer not found';
+  END IF;
+
+  -- 1. Validate live stock and lock inventory rows for each unique product
+  -- Aggregates SUM(quantity) in case the same product appears on multiple line items.
+  FOR v_product_id, v_qty IN
+    SELECT
+      (x->>'product_id')::UUID,
+      SUM((x->>'quantity')::NUMERIC)
+    FROM jsonb_array_elements(p_items) x
+    GROUP BY (x->>'product_id')::UUID
+  LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pos_products WHERE id = v_product_id AND is_active = TRUE
+    ) THEN
+      RAISE EXCEPTION 'Product not found or inactive: %', v_product_id;
+    END IF;
+
+    IF v_qty <= 0 THEN
+      RAISE EXCEPTION 'Quantity must be greater than zero';
+    END IF;
+
+    -- Ensure an inventory row exists so SELECT FOR UPDATE does not miss
+    INSERT INTO pos_inventory (product_id, quantity)
+    VALUES (v_product_id, 0)
+    ON CONFLICT (product_id) DO NOTHING;
+
+    -- Read the true live locked stock balance
+    SELECT quantity
+    INTO v_stock
     FROM pos_inventory
     WHERE product_id = v_product_id
     FOR UPDATE;
 
-    IF NOT FOUND OR v_avail < v_qty THEN
-      RAISE EXCEPTION 'Insufficient stock for product %', v_product_id;
+    IF v_stock < v_qty THEN
+      RAISE EXCEPTION
+        'Insufficient stock for product %. Available: %, requested: %',
+        v_product_id,
+        v_stock,
+        v_qty;
     END IF;
   END LOOP;
 
-  INSERT INTO pos_sales (customer_id)
-  VALUES (p_customer_id)
+  -- 2. Create the sale header record
+  INSERT INTO pos_sales (
+    customer_id,
+    sale_date,
+    total_amount,
+    amount_paid,
+    payment_status
+  )
+  VALUES (
+    p_customer_id,
+    CURRENT_DATE,
+    0,
+    0,
+    'credit'
+  )
   RETURNING id INTO v_sale_id;
 
-  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
+  -- 3. Create sale items and allocate FIFO cost
+  -- Exactly ONE pos_sale_items row is created per unique product so the
+  -- AFTER INSERT trigger (pos_sale_items_after_change_trg) fires ONCE per product,
+  -- deducting stock accurately without double-triggering inventory movements.
+  FOR v_product_id, v_qty, v_unit_price IN
+    SELECT
+      (x->>'product_id')::UUID,
+      SUM((x->>'quantity')::NUMERIC),
+      MAX((x->>'unit_price')::NUMERIC)
+    FROM jsonb_array_elements(p_items) x
+    GROUP BY (x->>'product_id')::UUID
   LOOP
-    v_product_id := (v_item ->> 'product_id')::UUID;
-    v_qty := (v_item ->> 'quantity')::NUMERIC;
-    v_price := (v_item ->> 'unit_price')::NUMERIC;
-
-    -- FIFO cost allocation
     v_remaining := v_qty;
-    FOR v_pi IN
-      SELECT pi.id AS purchase_item_id, pi.unit_cost,
-             pi.quantity - COALESCE((
-               SELECT SUM(a.quantity) FROM pos_sale_cost_allocations a WHERE a.purchase_item_id = pi.id
-             ), 0) AS available
+    v_cost_total := 0;
+    v_qty_total := 0;
+
+    -- Oldest purchase stock first
+    FOR v_purchase IN
+      SELECT
+        pi.id,
+        pi.quantity,
+        pi.unit_cost,
+        COALESCE(
+          (
+            SELECT SUM(a.quantity)
+            FROM pos_sale_cost_allocations a
+            WHERE a.purchase_item_id = pi.id
+          ),
+          0
+        ) AS allocated_quantity
       FROM pos_purchase_items pi
+      JOIN pos_purchases p ON p.id = pi.purchase_id
       WHERE pi.product_id = v_product_id
-        AND pi.quantity > COALESCE((
-          SELECT SUM(a.quantity) FROM pos_sale_cost_allocations a WHERE a.purchase_item_id = pi.id
-        ), 0)
-      ORDER BY pi.created_at ASC
+      ORDER BY
+        p.purchase_date ASC,
+        p.created_at ASC,
+        pi.created_at ASC,
+        pi.id ASC
     LOOP
       EXIT WHEN v_remaining <= 0;
-      v_alloc_qty := LEAST(v_remaining, v_pi.available);
 
-      INSERT INTO pos_sale_items (sale_id, product_id, quantity, unit_price, unit_cost)
-      VALUES (v_sale_id, v_product_id, v_alloc_qty, v_price, v_pi.unit_cost)
-      RETURNING id INTO v_sale_item_id;
+      IF v_purchase.quantity > v_purchase.allocated_quantity THEN
+        v_take := LEAST(
+          v_remaining,
+          v_purchase.quantity - v_purchase.allocated_quantity
+        );
 
-      INSERT INTO pos_sale_cost_allocations (sale_item_id, purchase_item_id, quantity, unit_cost)
-      VALUES (v_sale_item_id, v_pi.purchase_item_id, v_alloc_qty, v_pi.unit_cost);
-
-      v_remaining := v_remaining - v_alloc_qty;
+        v_cost_total := v_cost_total + (v_take * v_purchase.unit_cost);
+        v_qty_total  := v_qty_total + v_take;
+        v_remaining  := v_remaining - v_take;
+      END IF;
     END LOOP;
 
-    IF v_remaining > 0 THEN
-      -- Remaining without purchase cost allocation (fallback)
-      INSERT INTO pos_sale_items (sale_id, product_id, quantity, unit_price, unit_cost)
-      VALUES (v_sale_id, v_product_id, v_remaining, v_price, 0);
-    END IF;
+    -- Single insert per product -> fires pos_sale_items_after_change_trg once
+    INSERT INTO pos_sale_items (
+      sale_id,
+      product_id,
+      quantity,
+      unit_price,
+      unit_cost
+    )
+    VALUES (
+      v_sale_id,
+      v_product_id,
+      v_qty,
+      v_unit_price,
+      CASE
+        WHEN v_qty_total > 0 THEN ROUND(v_cost_total / v_qty_total, 2)
+        ELSE 0
+      END
+    )
+    RETURNING id INTO v_sale_item_id;
+
+    -- Persist exact purchase lots used in pos_sale_cost_allocations
+    v_remaining := v_qty;
+    FOR v_purchase IN
+      SELECT
+        pi.id,
+        pi.quantity,
+        pi.unit_cost,
+        COALESCE(
+          (
+            SELECT SUM(a.quantity)
+            FROM pos_sale_cost_allocations a
+            WHERE a.purchase_item_id = pi.id
+          ),
+          0
+        ) AS allocated_quantity
+      FROM pos_purchase_items pi
+      JOIN pos_purchases p ON p.id = pi.purchase_id
+      WHERE pi.product_id = v_product_id
+      ORDER BY
+        p.purchase_date ASC,
+        p.created_at ASC,
+        pi.created_at ASC,
+        pi.id ASC
+    LOOP
+      EXIT WHEN v_remaining <= 0;
+
+      IF v_purchase.quantity > v_purchase.allocated_quantity THEN
+        v_take := LEAST(
+          v_remaining,
+          v_purchase.quantity - v_purchase.allocated_quantity
+        );
+
+        INSERT INTO pos_sale_cost_allocations (
+          sale_item_id,
+          purchase_item_id,
+          quantity,
+          unit_cost
+        )
+        VALUES (
+          v_sale_item_id,
+          v_purchase.id,
+          v_take,
+          v_purchase.unit_cost
+        );
+
+        v_remaining := v_remaining - v_take;
+      END IF;
+    END LOOP;
   END LOOP;
 
-  -- Record payment if any
-  IF p_paid_amount IS NOT NULL AND p_paid_amount > 0 THEN
-    INSERT INTO pos_customer_payments (customer_id, sale_id, amount, payment_method)
+  -- 4. Process payment
+  SELECT total_amount
+  INTO v_total
+  FROM pos_sales
+  WHERE id = v_sale_id
+  FOR UPDATE;
+
+  IF v_total IS NULL THEN
+    RAISE EXCEPTION 'Created sale could not be found';
+  END IF;
+
+  IF v_paid > v_total THEN
+    RAISE EXCEPTION 'Paid amount of Rs. % exceeds sale total of Rs. %', v_paid, v_total;
+  END IF;
+
+  IF v_paid < v_total AND p_customer_id IS NULL THEN
+    RAISE EXCEPTION 'Customer is required for credit or partial payment sales';
+  END IF;
+
+  IF p_customer_id IS NOT NULL AND v_paid > 0 THEN
+    -- Customer ledger entry -> trigger pos_customer_payments_after_change will recalculate pos_sales
+    INSERT INTO pos_customer_payments (
+      customer_id,
+      sale_id,
+      amount,
+      payment_date,
+      payment_method
+    )
     VALUES (
-      COALESCE(p_customer_id, (SELECT id FROM pos_customers LIMIT 0)),
+      p_customer_id,
       v_sale_id,
-      p_paid_amount,
+      v_paid,
+      CURRENT_DATE,
       'cash'
     );
+  ELSIF p_customer_id IS NULL AND v_paid = v_total THEN
+    -- Fully paid walk-in sale
+    UPDATE pos_sales
+    SET
+      amount_paid = v_paid,
+      payment_status = 'paid',
+      updated_at = NOW()
+    WHERE id = v_sale_id;
   END IF;
 
   RETURN v_sale_id;
@@ -604,7 +774,7 @@ CREATE INDEX IF NOT EXISTS idx_pos_suppliers_is_active ON pos_suppliers (is_acti
 CREATE INDEX IF NOT EXISTS idx_pos_suppliers_name_trgm ON pos_suppliers USING gin (name gin_trgm_ops);
 
 -- Customer indexes
-CREATE INDEX IF NOT EXISTS idx_pos_customers_name_trgm ON pos_customers USING gin (name::citext gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_pos_customers_name_trgm ON pos_customers USING gin ((name::citext) gin_trgm_ops);
 
 -- Purchase indexes
 CREATE INDEX IF NOT EXISTS idx_pos_purchases_supplier_id ON pos_purchases (supplier_id);
@@ -640,3 +810,10 @@ CREATE INDEX IF NOT EXISTS idx_pos_sale_cost_allocations_purchase_item ON pos_sa
 CREATE INDEX IF NOT EXISTS idx_pos_customer_payments_customer ON pos_customer_payments (customer_id);
 CREATE INDEX IF NOT EXISTS idx_pos_customer_payments_sale ON pos_customer_payments (sale_id);
 CREATE INDEX IF NOT EXISTS idx_pos_customer_payments_date ON pos_customer_payments (payment_date);
+
+-- ----------------------------------------------------------------------------
+-- PERMISSIONS & GRANTS
+-- ----------------------------------------------------------------------------
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, anon, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated, anon, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO authenticated, anon, service_role;
