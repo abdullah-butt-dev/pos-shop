@@ -6,7 +6,7 @@ import type {
   PosSale,
   PosSaleItem,
   PosCustomerPayment,
-} from "./supabase"
+} from "./supabase";
 
 // ----------------------------------------------------------------------
 // Feature 3 — Products, Suppliers & Purchase Entry
@@ -15,8 +15,8 @@ import type {
 // ----------------------------------------------------------------------
 
 export interface PosAutocompleteOption {
-  id: string
-  name: string
+  id: string;
+  name: string;
 }
 
 async function searchByName(
@@ -24,18 +24,18 @@ async function searchByName(
   query: string,
 ): Promise<PosAutocompleteOption[]> {
   try {
-    const res = await fetch(`${endpoint}?q=${encodeURIComponent(query)}`)
-    const json = await res.json()
+    const res = await fetch(`${endpoint}?q=${encodeURIComponent(query)}`);
+    const json = await res.json();
 
     if (!res.ok || json.error) {
-      console.error(`Error searching ${endpoint}:`, json.error)
-      return []
+      console.error(`Error searching ${endpoint}:`, json.error);
+      return [];
     }
 
-    return json.data || []
+    return json.data || [];
   } catch (error) {
-    console.error(`Error in searchByName(${endpoint}):`, error)
-    return []
+    console.error(`Error in searchByName(${endpoint}):`, error);
+    return [];
   }
 }
 
@@ -48,68 +48,68 @@ async function createByName(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
-    })
+    });
 
-    const json = await res.json()
+    const json = await res.json();
 
     if (!res.ok || json.error) {
-      console.error(`Error creating via ${endpoint}:`, json.error)
-      return null
+      console.error(`Error creating via ${endpoint}:`, json.error);
+      return null;
     }
 
-    return json.data
+    return json.data;
   } catch (error) {
-    console.error(`Error in createByName(${endpoint}):`, error)
-    return null
+    console.error(`Error in createByName(${endpoint}):`, error);
+    return null;
   }
 }
 
 export interface PosProductRow {
-  id: string
-  name: string
-  unit: string
-  low_stock_threshold: number
-  is_active: boolean
-  created_at?: string
+  id: string;
+  name: string;
+  unit: string;
+  low_stock_threshold: number;
+  is_active: boolean;
+  created_at?: string;
 }
 
 export interface PosProductCreateInput {
-  name: string
-  unit?: string
-  low_stock_threshold?: number
+  name: string;
+  unit?: string;
+  low_stock_threshold?: number;
 }
 
 export interface PosProductUpdateInput {
-  name?: string
-  unit?: string
-  low_stock_threshold?: number
-  is_active?: boolean
+  name?: string;
+  unit?: string;
+  low_stock_threshold?: number;
+  is_active?: boolean;
 }
 
 export class PosProductService {
   static search(query: string): Promise<PosAutocompleteOption[]> {
-    return searchByName("/api/pos/products", query)
+    return searchByName("/api/pos/products", query);
   }
 
   static create(name: string): Promise<PosAutocompleteOption | null> {
-    return createByName("/api/pos/products", name)
+    return createByName("/api/pos/products", name);
   }
 
   // Full product catalog (active + inactive), used by the Inventory page.
   static async listAll(): Promise<PosProductRow[]> {
     try {
-      const res = await fetch("/api/pos/products?all=1")
-      const json = await res.json()
+      const res = await fetch("/api/pos/products?all=1");
+      const json = await res.json();
 
       if (!res.ok || json.error) {
-        console.error("Error listing products:", json.error)
-        return []
+        console.error("Error listing products:", json.error);
+        return [];
       }
 
-      return json.data || []
+      return json.data || [];
     } catch (error) {
-      console.error("Error in PosProductService.listAll:", error)
-      return []
+      console.error("Error in PosProductService.listAll:", error);
+      return [];
     }
   }
 
@@ -123,18 +123,20 @@ export class PosProductService {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
-      })
+      });
 
-      const json = await res.json()
+      const json = await res.json();
 
       if (!res.ok || json.error) {
-        throw new Error(json.error || "Failed to create product")
+        throw new Error(json.error || "Failed to create product");
       }
 
-      return json.data
+      return json.data;
     } catch (error) {
-      console.error("Error in PosProductService.createFull:", error)
-      throw error instanceof Error ? error : new Error("Failed to create product")
+      console.error("Error in PosProductService.createFull:", error);
+      throw error instanceof Error
+        ? error
+        : new Error("Failed to create product");
     }
   }
 
@@ -147,71 +149,73 @@ export class PosProductService {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
-      })
+      });
 
-      const json = await res.json()
+      const json = await res.json();
 
       if (!res.ok || json.error) {
-        throw new Error(json.error || "Failed to update product")
+        throw new Error(json.error || "Failed to update product");
       }
 
-      return json.data
+      return json.data;
     } catch (error) {
-      console.error("Error in PosProductService.update:", error)
-      throw error instanceof Error ? error : new Error("Failed to update product")
+      console.error("Error in PosProductService.update:", error);
+      throw error instanceof Error
+        ? error
+        : new Error("Failed to update product");
     }
   }
 
   static async delete(id: string): Promise<void> {
-    const res = await fetch(`/api/pos/products/${id}`, { method: 'DELETE' })
-    const json = await res.json()
+    const res = await fetch(`/api/pos/products/${id}`, { method: "DELETE" });
+    const json = await res.json();
     if (!res.ok || json.error) {
-      throw new Error(json.error || 'Failed to delete product')
+      throw new Error(json.error || "Failed to delete product");
     }
   }
 }
 
 export interface PosSupplierRow {
-  id: string
-  name: string
-  phone: string | null
-  address: string | null
-  notes: string | null
-  is_active: boolean
-  created_at?: string
+  id: string;
+  name: string;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at?: string;
 }
 
 export interface PosSupplierUpdateInput {
-  name?: string
-  phone?: string | null
-  address?: string | null
-  notes?: string | null
-  is_active?: boolean
+  name?: string;
+  phone?: string | null;
+  address?: string | null;
+  notes?: string | null;
+  is_active?: boolean;
 }
 
 export class PosSupplierService {
   static search(query: string): Promise<PosAutocompleteOption[]> {
-    return searchByName("/api/pos/suppliers", query)
+    return searchByName("/api/pos/suppliers", query);
   }
 
   static create(name: string): Promise<PosAutocompleteOption | null> {
-    return createByName("/api/pos/suppliers", name)
+    return createByName("/api/pos/suppliers", name);
   }
 
   static async listAll(): Promise<PosSupplierRow[]> {
     try {
-      const res = await fetch("/api/pos/suppliers?all=1")
-      const json = await res.json()
+      const res = await fetch("/api/pos/suppliers?all=1");
+      const json = await res.json();
 
       if (!res.ok || json.error) {
-        console.error("Error listing suppliers:", json.error)
-        return []
+        console.error("Error listing suppliers:", json.error);
+        return [];
       }
 
-      return json.data || []
+      return json.data || [];
     } catch (error) {
-      console.error("Error in PosSupplierService.listAll:", error)
-      return []
+      console.error("Error in PosSupplierService.listAll:", error);
+      return [];
     }
   }
 
@@ -224,127 +228,125 @@ export class PosSupplierService {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
-      })
+      });
 
-      const json = await res.json()
+      const json = await res.json();
 
       if (!res.ok || json.error) {
-        throw new Error(json.error || "Failed to update supplier")
+        throw new Error(json.error || "Failed to update supplier");
       }
 
-      return json.data
+      return json.data;
     } catch (error) {
-      console.error("Error in PosSupplierService.update:", error)
-      throw error instanceof Error ? error : new Error("Failed to update supplier")
+      console.error("Error in PosSupplierService.update:", error);
+      throw error instanceof Error
+        ? error
+        : new Error("Failed to update supplier");
     }
   }
 
   static async delete(id: string): Promise<void> {
-    const res = await fetch(`/api/pos/suppliers/${id}`, { method: 'DELETE' })
-    const json = await res.json()
+    const res = await fetch(`/api/pos/suppliers/${id}`, { method: "DELETE" });
+    const json = await res.json();
     if (!res.ok || json.error) {
-      throw new Error(json.error || 'Failed to delete supplier')
+      throw new Error(json.error || "Failed to delete supplier");
     }
   }
 }
 
 export class PosCustomerService {
   static search(query: string): Promise<PosAutocompleteOption[]> {
-    return searchByName("/api/pos/customers", query)
+    return searchByName("/api/pos/customers", query);
   }
 
   static create(name: string): Promise<PosAutocompleteOption | null> {
-    return createByName("/api/pos/customers", name)
+    return createByName("/api/pos/customers", name);
   }
 }
 
 export interface PosPurchaseItemInput {
-  product_id: string
-  quantity: number
-  unit_cost: number
+  product_id: string;
+  quantity: number;
+  unit_cost: number;
 }
 
 export interface PosCreatePurchaseInput {
-  supplier_id: string
-  purchase_date: string
-  reference_number?: string
-  notes?: string
-  items: PosPurchaseItemInput[]
-  amount_paid: number
-  payment_method?: string
+  supplier_id: string;
+  purchase_date: string;
+  reference_number?: string;
+  notes?: string;
+  items: PosPurchaseItemInput[];
+  amount_paid: number;
+  payment_method?: string;
 }
 
 export interface PosPurchaseItemWithProduct extends PosPurchaseItem {
-  pos_products: { name: string } | null
+  pos_products: { name: string } | null;
 }
 
 export interface PosPurchaseWithRelations extends PosPurchase {
-  pos_suppliers: { name: string } | null
-  pos_purchase_items: PosPurchaseItemWithProduct[]
+  pos_suppliers: { name: string } | null;
+  pos_purchase_items: PosPurchaseItemWithProduct[];
 }
 
 export class PosPurchaseService {
   static async list(): Promise<PosPurchaseWithRelations[]> {
     try {
-      const res = await fetch("/api/pos/purchases")
-      const json = await res.json()
+      const res = await fetch("/api/pos/purchases");
+      const json = await res.json();
 
       if (!res.ok || json.error) {
-        console.error("Error fetching purchases:", json.error)
-        return []
+        console.error("Error fetching purchases:", json.error);
+        return [];
       }
 
-      return json.data || []
+      return json.data || [];
     } catch (error) {
-      console.error("Error in PosPurchaseService.list:", error)
-      return []
+      console.error("Error in PosPurchaseService.list:", error);
+      return [];
     }
   }
 
   static async create(
     input: PosCreatePurchaseInput,
-  ): Promise<PosPurchaseWithRelations | null> {
-    try {
-      const res = await fetch("/api/pos/purchases", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      })
+  ): Promise<PosPurchaseWithRelations> {
+    const res = await fetch("/api/pos/purchases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
 
-      const json = await res.json()
+    const json = await res.json();
 
-      if (!res.ok || json.error) {
-        console.error("Error creating purchase:", json.error)
-        return null
-      }
-
-      return json.data
-    } catch (error) {
-      console.error("Error in PosPurchaseService.create:", error)
-      return null
+    if (!res.ok || json.error) {
+      const msg = json.error || "Failed to create purchase";
+      console.error("Error creating purchase:", msg);
+      throw new Error(msg);
     }
+
+    return json.data;
   }
 }
 
 export interface PosInventoryRow extends PosInventory {
-  pos_products: { name: string; unit: string } | null
+  pos_products: { name: string; unit: string } | null;
 }
 
 export class PosInventoryService {
   static async list(): Promise<PosInventoryRow[]> {
     try {
-      const res = await fetch("/api/pos/inventory")
-      const json = await res.json()
+      const res = await fetch("/api/pos/inventory");
+      const json = await res.json();
 
       if (!res.ok || json.error) {
-        console.error("Error fetching inventory:", json.error)
-        return []
+        console.error("Error fetching inventory:", json.error);
+        return [];
       }
 
-      return json.data || []
+      return json.data || [];
     } catch (error) {
-      console.error("Error in PosInventoryService.list:", error)
-      return []
+      console.error("Error in PosInventoryService.list:", error);
+      return [];
     }
   }
 }
@@ -355,37 +357,37 @@ export class PosInventoryService {
 // ----------------------------------------------------------------------
 
 export interface PosBusinessSettingsRow {
-  id: boolean
-  shop_name: string
-  currency: string
-  address: string | null
-  phone: string | null
-  invoice_prefix: string
-  default_low_stock_threshold: number
-  tax_rate: number
-  updated_at: string
+  id: boolean;
+  shop_name: string;
+  currency: string;
+  address: string | null;
+  phone: string | null;
+  invoice_prefix: string;
+  default_low_stock_threshold: number;
+  tax_rate: number;
+  updated_at: string;
 }
 
 export type PosBusinessSettingsInput = Partial<
   Omit<PosBusinessSettingsRow, "id" | "updated_at">
->
+>;
 
 export class PosSettingsService {
   static async get(): Promise<PosBusinessSettingsRow | null> {
     try {
-      const res = await fetch("/api/pos/settings")
-      const text = await res.text()
-      const json = text ? JSON.parse(text) : {}
+      const res = await fetch("/api/pos/settings");
+      const text = await res.text();
+      const json = text ? JSON.parse(text) : {};
 
       if (!res.ok || json?.error) {
-        console.error("Error fetching settings:", json?.error)
-        return null
+        console.error("Error fetching settings:", json?.error);
+        return null;
       }
 
-      return json.data || null
+      return json.data || null;
     } catch (error) {
-      console.error("Error in PosSettingsService.get:", error)
-      return null
+      console.error("Error in PosSettingsService.get:", error);
+      return null;
     }
   }
 
@@ -397,19 +399,21 @@ export class PosSettingsService {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
-      })
+      });
 
-      const text = await res.text()
-      const json = text ? JSON.parse(text) : {}
+      const text = await res.text();
+      const json = text ? JSON.parse(text) : {};
 
       if (!res.ok || json?.error) {
-        throw new Error(json?.error || "Failed to update settings")
+        throw new Error(json?.error || "Failed to update settings");
       }
 
-      return json.data
+      return json.data;
     } catch (error) {
-      console.error("Error in PosSettingsService.update:", error)
-      throw error instanceof Error ? error : new Error("Failed to update settings")
+      console.error("Error in PosSettingsService.update:", error);
+      throw error instanceof Error
+        ? error
+        : new Error("Failed to update settings");
     }
   }
 }
@@ -419,21 +423,20 @@ export class PosSettingsService {
 // ----------------------------------------------------------------------
 
 export interface PosSupplierPaymentInput {
-  supplier_id: string
-  purchase_id: string
-  amount: number
-  payment_date?: string
-  payment_method?: string
-  notes?: string
+  supplier_id: string;
+  purchase_id: string;
+  amount: number;
+  payment_date?: string;
+  payment_method?: string;
+  notes?: string;
 }
 
-export interface PosSupplierPaymentWithPurchase
-  extends PosSupplierPayment {
+export interface PosSupplierPaymentWithPurchase extends PosSupplierPayment {
   pos_purchases: {
-    purchase_date: string
-    reference_number: string | null
-    total_amount: number
-  } | null
+    purchase_date: string;
+    reference_number: string | null;
+    total_amount: number;
+  } | null;
 }
 
 export class PosSupplierPaymentService {
@@ -445,22 +448,22 @@ export class PosSupplierPaymentService {
         `/api/pos/supplier-payments?supplier_id=${encodeURIComponent(
           supplierId,
         )}`,
-      )
+      );
 
-      const json = await res.json()
+      const json = await res.json();
 
       if (!res.ok || json.error) {
-        console.error("Error fetching supplier payments:", json.error)
-        return []
+        console.error("Error fetching supplier payments:", json.error);
+        return [];
       }
 
-      return json.data || []
+      return json.data || [];
     } catch (error) {
       console.error(
         "Error in PosSupplierPaymentService.listForSupplier:",
         error,
-      )
-      return []
+      );
+      return [];
     }
   }
 
@@ -472,26 +475,21 @@ export class PosSupplierPaymentService {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
-      })
+      });
 
-      const json = await res.json()
+      const json = await res.json();
 
       if (!res.ok || json.error) {
-        throw new Error(
-          json.error || "Failed to record payment",
-        )
+        throw new Error(json.error || "Failed to record payment");
       }
 
-      return json.data
+      return json.data;
     } catch (error) {
-      console.error(
-        "Error in PosSupplierPaymentService.create:",
-        error,
-      )
+      console.error("Error in PosSupplierPaymentService.create:", error);
 
       throw error instanceof Error
         ? error
-        : new Error("Failed to record payment")
+        : new Error("Failed to record payment");
     }
   }
 }
@@ -501,41 +499,41 @@ export class PosSupplierPaymentService {
 // ----------------------------------------------------------------------
 
 export interface PosSaleItemWithProduct extends PosSaleItem {
-  pos_products: { name: string } | null
+  pos_products: { name: string } | null;
 }
 
 export interface PosSaleWithRelations extends PosSale {
-  pos_customers: { name: string } | null
-  pos_sale_items: PosSaleItemWithProduct[]
+  pos_customers: { name: string } | null;
+  pos_sale_items: PosSaleItemWithProduct[];
 }
 
 export interface PosCreateSaleItemInput {
-  product_id: string
-  quantity: number
-  unit_price: number
+  product_id: string;
+  quantity: number;
+  unit_price: number;
 }
 
 export interface PosCreateSaleInput {
-  customer_id: string | null
-  items: PosCreateSaleItemInput[]
-  paid_amount: number
+  customer_id: string | null;
+  items: PosCreateSaleItemInput[];
+  paid_amount: number;
 }
 
 export class PosSaleService {
   static async list(): Promise<PosSaleWithRelations[]> {
     try {
-      const res = await fetch("/api/pos/sales")
-      const json = await res.json()
+      const res = await fetch("/api/pos/sales");
+      const json = await res.json();
 
       if (!res.ok || json.error) {
-        console.error("Error fetching sales:", json.error)
-        return []
+        console.error("Error fetching sales:", json.error);
+        return [];
       }
 
-      return json.data || []
+      return json.data || [];
     } catch (error) {
-      console.error("Error in PosSaleService.list:", error)
-      return []
+      console.error("Error in PosSaleService.list:", error);
+      return [];
     }
   }
 
@@ -549,49 +547,44 @@ export class PosSaleService {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(input),
-      })
+      });
 
-      const text = await res.text()
-      let json: any = null
+      const text = await res.text();
+      let json: any = null;
       try {
-        json = text ? JSON.parse(text) : {}
+        json = text ? JSON.parse(text) : {};
       } catch {
-        throw new Error(text || `Server error (${res.status})`)
+        throw new Error(text || `Server error (${res.status})`);
       }
 
       if (!res.ok || json?.error) {
-        throw new Error(
-          json?.error || `Failed to create sale (${res.status})`,
-        )
+        throw new Error(json?.error || `Failed to create sale (${res.status})`);
       }
 
-      return json.data
+      return json.data;
     } catch (error) {
-      console.error("Error in PosSaleService.create:", error)
+      console.error("Error in PosSaleService.create:", error);
 
-      throw error instanceof Error
-        ? error
-        : new Error("Failed to create sale")
+      throw error instanceof Error ? error : new Error("Failed to create sale");
     }
   }
 }
 
 export interface PosCustomerPaymentInput {
-  customer_id: string
-  sale_id: string
-  amount: number
-  payment_date?: string
-  payment_method?: string
-  notes?: string
+  customer_id: string;
+  sale_id: string;
+  amount: number;
+  payment_date?: string;
+  payment_method?: string;
+  notes?: string;
 }
 
-export interface PosCustomerPaymentWithSale
-  extends PosCustomerPayment {
+export interface PosCustomerPaymentWithSale extends PosCustomerPayment {
   pos_sales: {
-    sale_date: string
-    notes: string | null
-    total_amount: number
-  } | null
+    sale_date: string;
+    notes: string | null;
+    total_amount: number;
+  } | null;
 }
 
 export class PosCustomerPaymentService {
@@ -603,25 +596,22 @@ export class PosCustomerPaymentService {
         `/api/pos/customer-payments?customer_id=${encodeURIComponent(
           customerId,
         )}`,
-      )
+      );
 
-      const json = await res.json()
+      const json = await res.json();
 
       if (!res.ok || json.error) {
-        console.error(
-          "Error fetching customer payments:",
-          json.error,
-        )
-        return []
+        console.error("Error fetching customer payments:", json.error);
+        return [];
       }
 
-      return json.data || []
+      return json.data || [];
     } catch (error) {
       console.error(
         "Error in PosCustomerPaymentService.listForCustomer:",
         error,
-      )
-      return []
+      );
+      return [];
     }
   }
 
@@ -635,26 +625,21 @@ export class PosCustomerPaymentService {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(input),
-      })
+      });
 
-      const json = await res.json()
+      const json = await res.json();
 
       if (!res.ok || json.error) {
-        throw new Error(
-          json.error || "Failed to record payment",
-        )
+        throw new Error(json.error || "Failed to record payment");
       }
 
-      return json.data
+      return json.data;
     } catch (error) {
-      console.error(
-        "Error in PosCustomerPaymentService.create:",
-        error,
-      )
+      console.error("Error in PosCustomerPaymentService.create:", error);
 
       throw error instanceof Error
         ? error
-        : new Error("Failed to record payment")
+        : new Error("Failed to record payment");
     }
   }
 }

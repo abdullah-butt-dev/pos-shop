@@ -63,7 +63,7 @@ export default function PurchasesPage() {
   const [purchaseDate, setPurchaseDate] = useState(todayISO);
   const [lineItems, setLineItems] = useState<LineItem[]>([emptyLineItem()]);
   const [amountPaid, setAmountPaid] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("Paid");
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("stock");
 
@@ -119,18 +119,19 @@ export default function PurchasesPage() {
     setPurchaseDate(todayISO());
     setLineItems([emptyLineItem()]);
     setAmountPaid("");
-    setPaymentMethod("");
+    setPaymentMethod("Paid");
   }
 
   // Auto-set amount paid based on payment mode
   function handlePaymentMethodChange(method: string) {
     setPaymentMethod(method);
     if (method === "Paid") {
-      setAmountPaid(String(total));
+      setAmountPaid("");
     } else if (method === "Credit") {
       setAmountPaid("0");
+    } else if (method === "Partial") {
+      setAmountPaid("");
     }
-    // For "Partial", let user enter manually
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -154,13 +155,31 @@ export default function PurchasesPage() {
       return;
     }
 
-
-    const totalCost = items.reduce((sum, item) => sum + item.quantity * item.unit_cost, 0);
+    const totalCost = items.reduce(
+      (sum, item) => sum + item.quantity * item.unit_cost,
+      0,
+    );
+    const mode = paymentMethod || "Paid";
     let finalAmountPaid = 0;
-    if (paymentMethod === "Paid") {
+
+    if (mode === "Paid") {
       finalAmountPaid = totalCost;
-    } else if (paymentMethod === "Partial") {
-      finalAmountPaid = Number(amountPaid) || 0;
+    } else if (mode === "Partial") {
+      const parsed = Number(amountPaid);
+      if (isNaN(parsed) || parsed <= 0) {
+        toast.error("Enter a valid amount paid for partial payment");
+        return;
+      }
+      if (parsed >= totalCost) {
+        toast.error(
+          "Partial amount cannot be equal to or greater than total. Select 'Paid' instead.",
+        );
+        return;
+      }
+      finalAmountPaid = parsed;
+    } else {
+      // Credit
+      finalAmountPaid = 0;
     }
 
     setSubmitting(true);
@@ -170,20 +189,22 @@ export default function PurchasesPage() {
         purchase_date: purchaseDate,
         items,
         amount_paid: finalAmountPaid,
-        payment_method: paymentMethod.trim() || undefined,
+        payment_method: mode,
       });
-
 
       if (!result) {
         toast.error("Failed to save purchase. Please try again.");
         return;
       }
 
-      toast.success("Purchase saved");
+      toast.success("Purchase saved successfully");
       resetForm();
       setActiveTab("stock");
       loadPurchases();
       loadInventory();
+    } catch (err: any) {
+      console.error("Save purchase error:", err);
+      toast.error(err?.message || "Failed to save purchase. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -245,8 +266,7 @@ export default function PurchasesPage() {
                               supplier: p.pos_suppliers?.name || "Unknown",
                               qty: i.quantity,
                               price: i.unit_cost,
-                              payment:
-                                p.payment_status || "Paid",
+                              payment: p.payment_status || "Paid",
                               paid: p.amount_paid,
                               due: p.amount_due,
                             })),
