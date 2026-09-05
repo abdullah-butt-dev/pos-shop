@@ -180,6 +180,51 @@ export async function PATCH(request: Request) {
     }
 
     const supabaseAdmin = getSupabaseAdmin();
+
+    if (typeof amount === "number" && amount > 0) {
+      // Overpayment guard: check against the sale's remaining collectible balance
+      const { data: existingPayment, error: payError } = await supabaseAdmin
+        .from("pos_customer_payments")
+        .select("id, sale_id, amount")
+        .eq("id", payment_id)
+        .maybeSingle();
+
+      if (payError || !existingPayment) {
+        return NextResponse.json(
+          { error: payError?.message || "Payment not found" },
+          { status: 404 },
+        );
+      }
+
+      if (existingPayment.sale_id) {
+        const { data: sale, error: saleError } = await supabaseAdmin
+          .from("pos_sales")
+          .select("id, amount_due")
+          .eq("id", existingPayment.sale_id)
+          .maybeSingle();
+
+        if (saleError || !sale) {
+          return NextResponse.json(
+            { error: saleError?.message || "Sale not found" },
+            { status: 404 },
+          );
+        }
+
+        const currentAmountDue = Number(sale.amount_due) || 0;
+        const oldPaymentAmount = Number(existingPayment.amount) || 0;
+        const maxAllowed = currentAmountDue + oldPaymentAmount;
+
+        if (amount - maxAllowed > 0.009) {
+          return NextResponse.json(
+            {
+              error: `Payment of Rs. ${amount} exceeds the remaining collectible balance of Rs. ${maxAllowed}`,
+            },
+            { status: 400 },
+          );
+        }
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from("pos_customer_payments")
       .update(updates)

@@ -34,7 +34,6 @@ type BusinessForm = {
   address: string;
   phone: string;
   invoice_prefix: string;
-  default_low_stock_threshold: string;
   tax_rate: string;
 };
 
@@ -44,7 +43,6 @@ const emptyBusinessForm: BusinessForm = {
   address: "",
   phone: "",
   invoice_prefix: "PT",
-  default_low_stock_threshold: "5",
   tax_rate: "0",
 };
 
@@ -55,7 +53,6 @@ function toForm(row: PosBusinessSettingsRow): BusinessForm {
     address: row.address || "",
     phone: row.phone || "",
     invoice_prefix: row.invoice_prefix || "PT",
-    default_low_stock_threshold: String(row.default_low_stock_threshold ?? 5),
     tax_rate: String(row.tax_rate ?? 0),
   };
 }
@@ -64,11 +61,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>("business");
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const { user, signOut, updateProfileName } = useAuth();
-  const [fullName, setFullName] = useState(
-    user?.user_metadata?.full_name || "",
-  );
-  const [updatingProfile, setUpdatingProfile] = useState(false);
+  const { user, signOut } = useAuth();
 
   const [businessForm, setBusinessForm] =
     useState<BusinessForm>(emptyBusinessForm);
@@ -83,12 +76,6 @@ export default function SettingsPage() {
   const [showCurrentPw, setShowCurrentPw] = useState(false);
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
-
-  useEffect(() => {
-    if (user?.user_metadata?.full_name) {
-      setFullName(user.user_metadata.full_name);
-    }
-  }, [user]);
 
   useEffect(() => {
     setMounted(true);
@@ -108,32 +95,11 @@ export default function SettingsPage() {
 
   const currentTheme = mounted ? theme : "dark";
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setUpdatingProfile(true);
-    try {
-      await updateProfileName(fullName);
-      toast.success("Profile updated");
-    } catch (err) {
-      toast.error("Failed to update profile");
-      console.error(err);
-    } finally {
-      setUpdatingProfile(false);
-    }
-  };
-
   const handleSaveBusiness = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!businessForm.shop_name.trim()) {
       toast.error("Business name is required");
-      return;
-    }
-
-    const threshold = Number(businessForm.default_low_stock_threshold);
-
-    if (!Number.isFinite(threshold) || threshold < 0) {
-      toast.error("Default low stock threshold must be zero or greater");
       return;
     }
 
@@ -145,7 +111,6 @@ export default function SettingsPage() {
         address: businessForm.address.trim(),
         phone: businessForm.phone.trim(),
         invoice_prefix: "PT",
-        default_low_stock_threshold: threshold,
         tax_rate: 0,
       });
       if (updated) setBusinessForm(toForm(updated));
@@ -356,32 +321,6 @@ export default function SettingsPage() {
                         placeholder="PKR"
                       />
                     </div>
-
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="default-threshold"
-                        className="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
-                      >
-                        Low Stock Alert
-                      </label>
-                      <input
-                        id="default-threshold"
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={businessForm.default_low_stock_threshold}
-                        onChange={(e) =>
-                          setBusinessForm((f) => ({
-                            ...f,
-                            default_low_stock_threshold: e.target.value,
-                          }))
-                        }
-                        className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--pos-brand)]"
-                      />
-                      <p className="text-[11px] text-muted-foreground">
-                        Default alert threshold for new products.
-                      </p>
-                    </div>
                   </div>
 
                   <div className="flex justify-end pt-2">
@@ -454,49 +393,6 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </div>
-              </div>
-
-              {/* Profile */}
-              <div className="pos-panel rounded-xl p-5 space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-[var(--pos-brand)] to-[var(--pos-accent-blue)] flex items-center justify-center font-bold text-black text-sm shrink-0">
-                    {fullName ? fullName[0].toUpperCase() : "O"}
-                  </div>
-                  <div>
-                    <p className="font-semibold">
-                      {fullName || user?.email || "Owner"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {user?.email}
-                    </p>
-                  </div>
-                </div>
-
-                <form onSubmit={handleUpdateProfile} className="space-y-3">
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="full-name"
-                      className="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
-                    >
-                      Display Name
-                    </label>
-                    <input
-                      id="full-name"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--pos-brand)]"
-                      placeholder="Owner"
-                      required
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={updatingProfile}
-                    className="flex items-center gap-2 bg-[var(--pos-brand)] hover:opacity-90 text-black px-4 py-2.5 rounded-xl font-semibold text-sm transition disabled:opacity-50 min-h-[44px]"
-                  >
-                    {updatingProfile ? "Saving..." : "Update Name"}
-                  </button>
-                </form>
               </div>
 
               {/* Change Password */}

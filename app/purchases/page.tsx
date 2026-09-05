@@ -259,7 +259,7 @@ export default function PurchasesPage() {
         <div className="max-w-5xl mx-auto px-4 py-5 space-y-5">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <h1 className="text-2xl font-bold">Inventory & Purchases</h1>
+              <h1 className="text-2xl font-bold">Purchases</h1>
               <p className="text-sm text-muted-foreground">
                 Record and manage stock purchases from suppliers
               </p>

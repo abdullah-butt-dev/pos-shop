@@ -1,127 +1,146 @@
-# Project Context: Perfect Traders POS System
+# POS Shop — System Architecture & Developer Context
 
-Developer reference document. Describes the architecture, file map, and the history of all significant changes made to this codebase.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 15 (App Router, TypeScript) |
-| Styling | Tailwind CSS v4 + custom CSS (globals.css) |
-| State | Zustand (local persistence, offline fallback) |
-| Database | Supabase — PostgreSQL, GoTrue auth |
-| PDF | jsPDF (client-side, no server) |
-| Icons | Lucide React |
-| Package manager | pnpm |
+This document provides a comprehensive overview of the `pos-shop` application architecture, database layer, accounting principles, data models, API endpoints, and component organization.
 
 ---
 
-## Key File Map
+## 1. High-Level Architecture
 
-| File | Role |
-|---|---|
-| [app/orders/page.tsx](file:///d:/DBs/codes/posL/POS-Sytem/app/orders/page.tsx) | Main POS ordering screen |
-| [app/inventory/page.tsx](file:///d:/DBs/codes/posL/POS-Sytem/app/inventory/page.tsx) | Product & category management |
-| [app/dashboard/page.tsx](file:///d:/DBs/codes/posL/POS-Sytem/app/dashboard/page.tsx) | Analytics, quick actions, recent transactions |
-| [app/bill-history/page.tsx](file:///d:/DBs/codes/posL/POS-Sytem/app/bill-history/page.tsx) | Transaction history, filters, share/export |
-| [app/settings/page.tsx](file:///d:/DBs/codes/posL/POS-Sytem/app/settings/page.tsx) | Business config and invoice settings |
-| [app/login/page.tsx](file:///d:/DBs/codes/posL/POS-Sytem/app/login/page.tsx) | Auth — sign in / sign up with role selection |
-| [app/globals.css](file:///d:/DBs/codes/posL/POS-Sytem/app/globals.css) | Design tokens, dark/light theme, utility classes |
-| [components/pos/sidebar.tsx](file:///d:/DBs/codes/posL/POS-Sytem/components/pos/sidebar.tsx) | Navigation sidebar, account switcher, role guard |
-| [components/pos/order-summary.tsx](file:///d:/DBs/codes/posL/POS-Sytem/components/pos/order-summary.tsx) | Cart panel, payment method, place order |
-| [components/pos/product-card.tsx](file:///d:/DBs/codes/posL/POS-Sytem/components/pos/product-card.tsx) | Product tile with quantity controls |
-| [components/pos/category-card.tsx](file:///d:/DBs/codes/posL/POS-Sytem/components/pos/category-card.tsx) | Category filter chip |
-| [lib/store.ts](file:///d:/DBs/codes/posL/POS-Sytem/lib/store.ts) | Zustand store — products, categories, orders, invoice settings |
-| [lib/supabase.ts](file:///d:/DBs/codes/posL/POS-Sytem/lib/supabase.ts) | Supabase client + type definitions for DB tables |
-| [lib/bill-service.ts](file:///d:/DBs/codes/posL/POS-Sytem/lib/bill-service.ts) | Supabase CRUD for bill_history |
-| [lib/pdf-generator.ts](file:///d:/DBs/codes/posL/POS-Sytem/lib/pdf-generator.ts) | jsPDF invoice builder |
-| [context/auth-context.tsx](file:///d:/DBs/codes/posL/POS-Sytem/context/auth-context.tsx) | Supabase auth session, user metadata, switchRole() |
-| [hooks/use-supabase-data.ts](file:///d:/DBs/codes/posL/POS-Sytem/hooks/use-supabase-data.ts) | Data fetching hook with 5-min cache and Zustand fallback |
+The system is designed as an operational Point of Sale (POS) and inventory management platform for commercial retail and wholesale businesses:
+
+- **Frontend / Application Layer**: Next.js 14 App Router, React 18, Tailwind CSS, Lucide React, and Radix UI components.
+- **Backend / API Layer**: Next.js Route Handlers (`/api/pos/*`) utilizing Supabase Admin client (`SUPABASE_SERVICE_ROLE_KEY`) for secure data operations and integrity checks.
+- **Database & Trigger Layer**: Supabase PostgreSQL 15+ containing relational tables, foreign key constraints, CITEXT case-insensitive unique identifiers, automated recalculation triggers, and atomic stored procedures.
+- **Client PDF Generation**: `jsPDF` builds branded thermal/invoice receipts directly in the browser on demand, requiring 0 storage bucket allocation.
 
 ---
 
-## Design System
+## 2. Directory & Route Map
 
-### Color Tokens (globals.css)
-- `--pos-brand` — mint green, primary CTA and active states
-- `--pos-accent-blue`, `--pos-accent-purple`, `--pos-accent-pink` — secondary accents for tiles and badges
-- `--pos-panel` — card/panel background (adapts light/dark)
-- `--pos-panel-2` — deeper background layer
-- `--pos-stroke` — border color
-
-### Utility Classes
-- `.pos-panel` — glass-card style panel (background + border + radius)
-- `.tile`, `.tile-mint`, `.tile-blue`, `.tile-purple`, `.tile-pink` — coloured category tiles
-- `.animate-pop` — 300ms scale pop for add-to-cart feedback
-
-### Roles
-Three roles stored in `user_metadata.role`:
-- `owner` — full access to all pages
-- `cashier` — orders + bill history only
-- `worker` — inventory only
-
-Role enforcement is handled in `sidebar.tsx` via `currentAllowed` paths. Auto-redirect fires in a `useEffect` when the current path is not in the allowed list.
+```
+pos-shop/
+├── app/
+│   ├── api/pos/
+│   │   ├── autocomplete/
+│   │   │   ├── customers/route.ts   # Autocomplete + inline creation of customers
+│   │   │   ├── products/route.ts    # Autocomplete + inline creation of products
+│   │   │   └── suppliers/route.ts   # Autocomplete + inline creation of suppliers
+│   │   ├── customer-payments/
+│   │   │   └── route.ts             # Record, edit (with overpayment guard), and delete collections
+│   │   ├── customers/
+│   │   │   └── route.ts             # Customer listing and query
+│   │   ├── inventory/
+│   │   │   └── route.ts             # Live inventory balances per product
+│   │   ├── orders/
+│   │   │   └── route.ts             # Create sales with FIFO cost allocation via RPC
+│   │   ├── payables/
+│   │   │   └── route.ts             # Supplier payables listing with amount due
+│   │   ├── products/
+│   │   │   ├── [id]/route.ts        # Update product metadata or soft/hard delete
+│   │   │   └── route.ts             # Product catalog listing and creation
+│   │   ├── purchases/
+│   │   │   └── route.ts             # Record purchases and list historical purchase orders
+│   │   ├── receivables/
+│   │   │   └── route.ts             # Customer receivables listing with amount due
+│   │   ├── reports/
+│   │   │   └── route.ts             # Consolidated dashboard KPI reports
+│   │   ├── settings/
+│   │   │   └── route.ts             # Business profile and invoice settings
+│   │   ├── supplier-payments/
+│   │   │   └── route.ts             # Record supplier disbursements
+│   │   └── suppliers/
+│   │       ├── [id]/route.ts        # Update supplier or delete with FK check
+│   │       └── route.ts             # Supplier catalog listing and creation
+│   ├── dashboard/page.tsx           # Dashboard with KPIs, cash flows, and recent sales
+│   ├── inventory/page.tsx           # Products & Suppliers catalog management
+│   ├── orders/page.tsx              # New Sale POS terminal and checkout
+│   ├── payables/page.tsx            # Payables management and supplier payments
+│   ├── purchases/page.tsx           # Purchases (Add Purchase & Recent Purchases)
+│   ├── receivables/page.tsx         # Receivables management, cash collections, and payment edits
+│   ├── settings/page.tsx            # Business settings and user password management
+│   ├── login/page.tsx               # Supabase authentication sign-in
+│   ├── layout.tsx                   # Root layout with AuthProvider and NavHeader
+│   └── page.tsx                     # Home directory / quick navigation cards
+├── components/
+│   ├── pos/
+│   │   ├── autocomplete-field.tsx   # Generic searchable dropdown with inline creation
+│   │   ├── cart-context.tsx         # React context for active order state
+│   │   ├── nav-header.tsx           # Responsive navigation header and hamburger sheet
+│   │   ├── order-summary.tsx        # Cart summary, payment modes, and checkout submission
+│   │   └── product-card.tsx         # POS catalog item card with stock badge
+│   └── ui/                          # Radix/Shadcn primitives (dialog, button, input, etc.)
+├── context/
+│   └── auth-context.tsx             # Supabase GoTrue authentication state
+├── lib/
+│   ├── pos-receipt-pdf.ts           # Client-side PDF receipt generation via jsPDF
+│   ├── pos-service.ts               # Typed frontend client API service classes
+│   ├── supabase.ts                  # Supabase client and TypeScript entity definitions
+│   ├── supabase-admin.ts            # Supabase service role client for API routes
+│   └── utils.ts                     # Utility helpers and cn class merger
+└── schema.sql                       # Complete PostgreSQL database schema and triggers
+```
 
 ---
 
-## Changelog
+## 3. Database Entities & Schemas
 
-### 1. Employee Profile Switcher & Order Attribution
-- Replaced hardcoded "Table 5" label with the logged-in user's full name and role
-- Active profile string (`Name (Role)`) saved to `table_number` in `bill_history` and printed on PDF under `CASHIER:`
-- Conditional label handling — shows `CASHIER:` if the value doesn't contain "table", otherwise `TABLE:`
+1. **`pos_products`**: Product catalog (`id`, `name citext unique`, `unit`, `is_active`, `created_at`, `updated_at`).
+2. **`pos_suppliers`**: Supplier directory (`id`, `name citext unique`, `phone`, `address`, `notes`, `is_active`, `created_at`, `updated_at`).
+3. **`pos_customers`**: Customer directory (`id`, `name citext unique`, `phone`, `notes`, `created_at`, `updated_at`).
+4. **`pos_purchases`**: Purchase invoices (`id`, `supplier_id`, `purchase_date`, `reference_number`, `notes`, `total_amount`, `amount_paid`, `amount_due`, `payment_status`, `created_at`, `updated_at`).
+5. **`pos_purchase_items`**: Purchase line items (`id`, `purchase_id`, `product_id`, `quantity`, `unit_cost`, `line_total`, `created_at`).
+6. **`pos_inventory`**: Live inventory on hand (`product_id PK`, `quantity`, `updated_at`).
+7. **`pos_inventory_movements`**: Audit log of stock adjustments (`id`, `product_id`, `movement_type`, `quantity_change`, `balance_after`, `reference_type`, `reference_id`, `notes`, `created_at`).
+8. **`pos_supplier_payments`**: Cash disbursements to suppliers (`id`, `supplier_id`, `purchase_id`, `amount`, `payment_date`, `payment_method`, `notes`, `created_at`).
+9. **`pos_sales`**: Sales invoices (`id`, `customer_id`, `sale_date`, `receipt_number`, `notes`, `total_amount`, `amount_paid`, `amount_due`, `payment_status`, `created_at`, `updated_at`).
+10. **`pos_sale_items`**: Sale line items (`id`, `sale_id`, `product_id`, `quantity`, `unit_price`, `unit_cost`, `line_total`, `line_cost_total`, `created_at`).
+11. **`pos_sale_cost_allocations`**: FIFO cost mapping connecting sale items to specific purchase batches (`id`, `sale_item_id`, `purchase_item_id`, `quantity`, `unit_cost`, `created_at`).
+12. **`pos_customer_payments`**: Cash collections from customers (`id`, `customer_id`, `sale_id`, `amount`, `payment_date`, `payment_method`, `notes`, `created_at`).
+13. **`pos_business_settings`**: Single-row configuration (`id = true`, `shop_name`, `currency`, `address`, `phone`, `invoice_prefix`, `tax_rate`, `updated_at`).
 
-### 2. Real-Time Clock on Orders Page
-- Live date + time widget next to the search bar on the orders screen
-- Updates every second via `setInterval`, hydration-safe (null until client mounts)
+---
 
-### 3. Role-Based Access Control
-- Role selection added to the sign-up form (`Owner` / `Cashier` / `Worker`)
-- Sidebar filters navigation items based on role, redirects on unauthorized access
-- Account switcher in the sidebar bottom — switches role in `user_metadata` without sign-out
-- Three pre-configured demo accounts in the switcher: Admin (Owner), Sarah (Cashier), John (Worker)
+## 4. Business Logic & Accounting Rules
 
-### 4. Database Schema Fixes
-- Added `payment_method` column to `bill_history`
-- Widened `table_number` from `VARCHAR(20)` to `VARCHAR(100)` to fit full cashier name strings
-- Confirmed RLS policies allow authenticated insert/select on all tables
+### Single Source of Truth
 
-### 5. Category Card Ring Clipping Fix
-- Replaced `ring-2` selected state with `border-2 border-foreground p-[15px]` to avoid outline clipping from `overflow-hidden` on the parent tile
+Financial aggregates and inventory levels are recalculated dynamically by PostgreSQL trigger functions:
 
-### 6. Category Deletion with Cascade
-- `deleteCategory` added to Zustand store — cascades product deletion in offline mode
-- Wired up in `inventory/page.tsx` with a confirmation toast before delete
+- `pos_adjust_inventory()`: Updates `pos_inventory.quantity` and appends an immutable movement to `pos_inventory_movements`.
+- `pos_recalc_purchase()`: Computes `total_amount = SUM(line_total)`, `amount_paid = SUM(amount)`, `amount_due = total_amount - amount_paid`, and sets `payment_status` (`paid`, `partial`, `unpaid`).
+- `pos_recalc_sale()`: Computes `total_amount = SUM(line_total)`, `amount_paid = SUM(amount)`, `amount_due = total_amount - amount_paid`, and sets `payment_status` (`paid`, `partial`, `credit`).
 
-### 7. Supabase Env Fallback
-- Hardcoded public Supabase URL and anon key as fallback values in `lib/supabase.ts`
-- Prevents crash on hosted deployments (e.g., Vercel) where env vars may not be set
+### Revenue & Profit Recognition
 
-### 8. Inventory Page — Slide-Over Drawer
-- Add/Edit Product form moved into a right-side slide-over drawer (`fixed inset-0` + `slide-in-from-right`)
-- Backdrop click closes the drawer; form resets on close
-- Drawer shows category name in the header subtitle for context
+- **Recognition on Sale Date**: Revenue (`total_amount`) and Profit (`total_amount - line_cost_total`) are recognized immediately on the original `sale_date`, regardless of whether payment was collected in full, partially, or sold on store credit.
+- **Customer Payments as Cash Inflow**: Subsequent customer payments recorded in `pos_customer_payments` are cash collections that reduce accounts receivable. They are reported as Cash Inflow in cash flow statements and are **never** counted as revenue or profit on the collection date.
 
-### 9. Bill History — Share Modal
-- Share button on each bill opens a formatted text preview modal
-- Options: **Copy to Clipboard**, **WhatsApp** (deep link), **Web Share API** (mobile native)
-- Summary share button for the entire filtered result set
+### FIFO Cost Allocation
 
-### 10. Dashboard Improvements
-- Stats cards with hidden-by-default revenue/profit (Eye toggle)
-- Recent transactions feed — click any row to open a bill preview modal with download
-- Low stock depletion gauge bars with per-product restock quantity input
-- Role-aware Quick Actions Dock — different buttons for Owner, Cashier, Worker
+When `pos_create_sale()` is invoked:
 
-### 11. Light/Dark Mode Audit
-- All hardcoded colors replaced with CSS variable equivalents or `dark:` variants
-- Avatar backgrounds use `--pos-brand`, `--pos-accent-purple`, `--pos-accent-blue` by role
-- Inactive nav items restored with `hover:bg-foreground/[0.06] hover:text-foreground`
-- Share tile icons use `text-neutral-800 dark:text-neutral-900` for contrast on pastel backgrounds
-- Action buttons in inventory, bill history, and dashboard verified in both modes
+- It locks current inventory records using `SELECT FOR UPDATE` to avoid negative stock or race conditions.
+- It steps chronologically through unexhausted `pos_purchase_items` for each product to allocate the exact historical `unit_cost` via `pos_sale_cost_allocations`.
+- Weighted average cost is recorded on `pos_sale_items.unit_cost` for accurate margin tracking.
 
-### 12. Keyboard Shortcut — Place Order
-- Pressing `Enter` (or `Ctrl+Enter`) on the orders page submits the order when the cart is non-empty
-- Guard prevents trigger when focus is inside an input, textarea, or select
+### Payment Validation & Overpayment Guard
+
+- When recording a new customer payment, the payment amount cannot exceed the open `amount_due` on the target sale.
+- When editing an existing customer payment via `PATCH /api/pos/customer-payments`, the updated amount cannot exceed `sale.amount_due + old_payment_amount`.
+
+### Safe Deletion
+
+- Products and suppliers with related purchase items or sale items are protected by foreign key constraints (`ON DELETE RESTRICT`).
+- API routes catch PostgreSQL error code `23503` and return clear `409 Conflict` errors preventing record deletion when dependencies exist. Products can alternatively be deactivated (`is_active = false`).
+
+### Zero-Storage Receipts
+
+- Receipts are built dynamically on the client side using `jsPDF`. No binary files or PDF blobs are persisted to Supabase storage buckets, conserving free-tier storage limits.
+
+---
+
+## 5. Security & Authentication
+
+- Single-user business authentication managed via Supabase GoTrue (`useAuth()` context and `auth-context.tsx`).
+- Protected routes redirect unauthenticated users to `/login`.
+- Server routes verify sessions or operate through `getSupabaseAdmin()` service role client for privileged database execution.

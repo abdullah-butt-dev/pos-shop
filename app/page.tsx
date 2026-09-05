@@ -23,7 +23,7 @@ const sectionCards = [
   },
   {
     icon: Truck,
-    title: "Inventory / Purchases",
+    title: "Purchases",
     description: "Record purchases and view current stock levels",
     href: "/purchases",
     color: "bg-[var(--pos-accent-blue)]/15 text-[var(--pos-accent-blue-text)]",

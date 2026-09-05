@@ -1,180 +1,131 @@
-# Perfect Traders — POS System
+# Perfect Traders — Point of Sale (POS) System
 
-> A fast, modern Point of Sale system built for real businesses. Handles orders, inventory, billing, and analytics — all in one clean interface.
-
-Built with **Next.js 15**, **Supabase**, and **Tailwind CSS v4**. Designed for tablets, desktop counters, and busy retail environments.
+A fast, responsive, and robust Point of Sale system built with Next.js 14 App Router, Supabase (PostgreSQL), and Tailwind CSS. Tailored for commercial wholesale and retail counter operations.
 
 ---
 
-## Features
+## 🚀 Key Features
 
-### Orders & Checkout
-- Product grid with category filtering and live search (debounced, 300ms)
-- **Retail / Wholesale** price mode toggle — switch mid-session, prices update instantly
-- Cart with per-item quantity controls and stock limit enforcement
-- Payment method selection: **Cash**, **Online (UPI/QR)**, **Credit**
-- Place order with **Enter key** shortcut for fast cashier workflows
-- Auto-generates and downloads a branded PDF invoice on checkout
-- Real-time clock widget on the orders screen
+### 1. 📊 Dashboard (`/dashboard`)
 
-### Inventory Management
-- Slide-over drawer for adding or editing products — no page leave required
-- Per-category product listing with instant search
-- Low stock alerts with visual pulse indicators and badge tags
-- Stock quantity tracking with configurable per-product thresholds
-- Add / delete categories with cascade product cleanup
-- Full Supabase sync with Zustand offline fallback
+- **Real-time Business Financials**: Key performance indicators including Total Sales Revenue, Estimated Profit, Cash Inflow (customer collections), and Cash Outflow (supplier disbursements).
+- **Outstanding Balances**: Live Customer Receivables and Supplier Payables tracking.
+- **Catalog Health**: Total active products count.
+- **Recent Sales Audit**: View chronological customer sales with receipt number, customer, line item counts, total amount, payment status, and instant on-demand PDF receipt downloads.
 
-### Bill History
-- Full searchable transaction history pulled from Supabase
-- Filter by **type** (Retail / Wholesale) and **date range** (Today / Week / Month)
-- Stats bar: total bills, retail revenue, wholesale revenue, grand total
-- Per-bill actions: **View**, **Share**, **Download PDF**
-- **Share modal** with Copy Text, WhatsApp, and native Web Share options
-- Bill summary sharing with formatted receipt text
+### 2. 🛒 New Sale (`/orders`)
 
-### Dashboard & Analytics
-- Revenue, profit, orders count, and low-stock alerts at a glance
-- Hidden-by-default revenue/profit cards (toggle to reveal)
-- Product sales share chart with horizontal progress bars
-- Recent transactions timeline with clickable bill preview
-- Low stock depletion gauges with one-click restock inputs
-- **Role-aware Quick Actions Dock** — different shortcuts for Owner, Cashier, and Worker
+- **Fast-Paced Register Interface**: Clean grid view of active inventory with responsive layout and live stock indicators.
+- **Customer Search & Creation**: Autocomplete lookup for existing customers with inline instant customer addition.
+- **Flexible Payment Handling**:
+  - **Paid**: Full payment collected upfront.
+  - **Credit**: Zero payment collected upfront; balance added to customer receivables.
+  - **Partial**: Split payment; specify cash collected with remaining balance added to customer receivables.
+- **On-the-Fly PDF Receipts**: Direct client-side receipt generation and download using `jsPDF` without storing files or consuming database storage quotas.
 
-### Role-Based Access Control
-- Three roles: **Owner** (full access), **Cashier** (orders + history), **Worker** (inventory only)
-- Role stored in Supabase `user_metadata`, enforced client-side with auto-redirect
-- Account switcher in sidebar — switch between roles without signing out
-- Role-aware page visibility in the navigation sidebar
+### 3. 📦 Purchases (`/purchases`)
 
-### Settings & Customization
-- Business name, address, GST/tax number
-- Configurable tax rate
-- Invoice header and footer text
-- Paper size: A4 or 58mm thermal receipt
-- Settings persisted locally via Zustand
+- **Dedicated Purchase Entry**: Tabbed interface to record incoming purchase invoices from suppliers.
+- **Supplier Autocomplete**: Instant lookup and on-the-fly supplier creation.
+- **Itemized Costs**: Multi-line item entry specifying product, quantity, and unit cost.
+- **Payment Terms**: Paid, Credit (unpaid), or Partial disbursement with automatic balance calculation.
+- **Recent Purchases Log**: Expandable history showing line items, pricing, payment status, and outstanding balances.
 
-### Design System
-- **Light and dark mode** with a mint-green brand palette and themed accent colors
-- Consistent `pos-panel` glass-card system across all pages
-- Smooth micro-animations: page transitions, hover lifts, button press feedback
-- Minimal adaptive scrollbars that match the current theme
-- Accessible focus rings, ARIA labels, and keyboard navigation
+### 4. 🏷️ Products & Suppliers Catalog (`/inventory`)
+
+- **Product Catalog**: Manage product names, units of measure, and active status with live on-hand stock quantities.
+- **Supplier Directory**: Manage supplier profiles, contact numbers, addresses, and notes.
+- **Safe Deletion Guards**: Foreign key protections prevent accidental deletion of products or suppliers with linked transaction history.
+
+### 5. 💳 Payables (`/payables`)
+
+- **Supplier Debt Tracking**: Monitor total outstanding supplier balances across all open purchases.
+- **Record Disbursements**: Log partial or full payments against specific supplier purchases.
+- **Payment Audit**: Track historical disbursements with payment method and date.
+
+### 6. 👥 Receivables (`/receivables`)
+
+- **Customer Credit Management**: Comprehensive overview of outstanding credit owed by customers.
+- **Cash Collections**: Record customer payments against open sales invoices with built-in overpayment prevention.
+- **Payment Management**: View and edit collection records with real-time recalculation of remaining customer balances.
+
+### 7. ⚙️ Settings (`/settings`)
+
+- **Shop Identity & Invoicing**: Configure Shop Name, Currency symbol, Business Address, Phone Number, and Invoice Prefix.
+- **Tax Configuration**: Set system-wide tax percentage.
+- **Account Security**: Update account password via Supabase Auth.
 
 ---
 
-## Tech Stack
+## 🏗️ Architectural Foundations
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 15 (App Router) |
-| Language | TypeScript |
-| Styling | Tailwind CSS v4, Vanilla CSS animations |
-| Database | Supabase (PostgreSQL) |
-| Auth | Supabase GoTrue |
-| State | Zustand (local persistence + offline fallback) |
-| PDF | jsPDF (client-side, no server needed) |
-| Icons | Lucide React |
-| Date utils | date-fns |
-| Package manager | pnpm |
+- **Single Source of Truth**: Financial totals, stock balances, and payment statuses are calculated and maintained directly at the database layer using PostgreSQL triggers and functions:
+  - `pos_adjust_inventory`: Adjusts stock and logs inventory movements on purchase and sale events.
+  - `pos_recalc_sale` & `pos_recalc_purchase`: Automatically compute line totals, amounts paid, amounts due, and payment statuses (`paid`, `partial`, `credit`/`unpaid`).
+  - `pos_create_sale` & `pos_create_purchase`: Atomic stored procedures enforcing stock availability and FIFO cost allocation.
+- **Revenue Recognition Rule**: Revenue and profit are recognized immediately on the original sale date (regardless of whether paid in cash, partial, or on credit). Customer payments are cash collections only; they reduce receivables and are reported as Cash Inflow, never double-counted as revenue or profit.
+- **Zero Storage Bucket Consumption**: Receipts are generated client-side on demand using `jsPDF`. No binary files are stored in Supabase storage buckets, keeping storage usage within free-tier limits.
 
 ---
 
-## Getting Started
+## 🛠️ Tech Stack
+
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript
+- **Database & Auth**: Supabase (PostgreSQL 15+, GoTrue Auth)
+- **Styling**: Tailwind CSS & Lucide Icons
+- **UI Components**: Radix UI / Shadcn primitives
+- **Client PDF Generation**: `jsPDF`
+
+---
+
+## 🏁 Getting Started
 
 ### Prerequisites
-- Node.js 18+
-- pnpm
+
+- Node.js 18.x or higher
+- npm or pnpm
 - A Supabase project
 
-### 1. Clone & install
+### 1. Clone & Install Dependencies
 
 ```bash
-git clone https://github.com/DivineDB/POS-Sytem.git
-cd POS-Sytem
-pnpm install
+git clone <repository-url>
+cd pos-shop
+npm install
 ```
 
-### 2. Set environment variables
+### 2. Configure Environment Variables
 
-Create `.env.local` in the project root:
+Create a `.env.local` file in the root directory:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-### 3. Set up the database
+### 3. Deploy Database Schema
 
-Run `complete-fresh-setup.sql` in your Supabase SQL editor. This creates:
-- `categories` table
-- `products` table with stock and order tracking
-- `bill_history` table with full line items
-- RLS policies and helper functions
+Execute `schema.sql` in your Supabase SQL Editor:
 
-### 4. Run the dev server
+1. Open the Supabase dashboard and navigate to **SQL Editor**.
+2. Copy and paste the contents of `schema.sql`.
+3. Run the query to create tables, triggers, indexes, and initial settings.
+
+### 4. Run Development Server
 
 ```bash
-pnpm dev
+npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — you'll be redirected to the login page.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## Database Schema
+## 📜 Scripts
 
-```
-categories        id, name, color
-products          id, name, category, retail_price, wholesale_price, stock, low_stock_threshold, order_count
-bill_history      id, bill_number, table_number, type, payment_method, items (jsonb), subtotal, tax, total, created_at
-```
-
----
-
-## Payment Methods
-
-| Method | Use case |
-|---|---|
-| 💰 Cash | Physical currency |
-| 📱 Online | UPI, QR code, card machine |
-| 💳 Credit | Credit sales / account-based billing |
-
----
-
-## Project Structure
-
-```
-app/
-  login/          Auth screen (sign in / sign up with role selection)
-  orders/         Main POS screen
-  inventory/      Product and category management
-  bill-history/   Transaction history and export
-  dashboard/      Analytics and quick operations
-  settings/       Business config and invoice settings
-
-components/
-  pos/            Sidebar, ProductCard, CategoryCard, OrderSummary, SearchBar
-  inventory/      ProductForm
-  ui/             Shared primitives (PageTransition, LoadingSkeleton, etc.)
-
-lib/
-  store.ts        Zustand store
-  supabase.ts     Supabase client + type definitions
-  bill-service.ts Supabase bill CRUD
-  pdf-generator.ts jsPDF invoice builder
-
-context/
-  auth-context.tsx  Auth state, role management, switchRole()
-```
-
----
-
-## License
-
-MIT — free to use, modify, and deploy.
-
----
-
-*Built by Perfect Traders · 2026*
-# pos-shop
+- `npm run dev`: Starts the Next.js development server.
+- `npm run build`: Compiles and builds the production application.
+- `npm run start`: Runs the production build.
+- `npm run lint`: Checks for linting errors.

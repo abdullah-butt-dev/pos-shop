@@ -35,7 +35,6 @@ export interface PosProduct {
   id: string;
   name: string;
   unit: string;
-  low_stock_threshold: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -164,7 +163,6 @@ export interface PosBusinessSettings {
   address: string | null;
   phone: string | null;
   invoice_prefix: string;
-  default_low_stock_threshold: number;
   tax_rate: number;
   updated_at: string;
 }

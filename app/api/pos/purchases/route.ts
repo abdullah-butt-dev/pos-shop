@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
+export const dynamic = "force-dynamic";
+
 const PURCHASE_SELECT =
   "*, pos_suppliers(name), pos_purchase_items(*, pos_products(name))";
 
@@ -19,7 +21,17 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ data: data || [] });
+    return NextResponse.json(
+      { data: data || [] },
+      {
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      },
+    );
   } catch (err: any) {
     console.error("[API /api/pos/purchases] Unexpected error:", err);
     return NextResponse.json(

@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
+export const dynamic = "force-dynamic";
+
 function escapeLikePattern(input: string) {
   return input.replace(/[%_\\]/g, (match) => `\\${match}`);
 }
 
 // GET /api/pos/products?q=cok       -> autocomplete matches while typing
 // GET /api/pos/products?all=1       -> full catalog (active + inactive) with
-//                                       unit/threshold, for the Inventory page
+//                                       unit, for the Inventory page
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -21,9 +23,7 @@ export async function GET(request: Request) {
         await Promise.all([
           supabaseAdmin
             .from("pos_products")
-            .select(
-              "id, name, unit, low_stock_threshold, is_active, created_at",
-            )
+            .select("id, name, unit, is_active, created_at")
             .order("name", { ascending: true }),
           supabaseAdmin.from("pos_purchase_items").select("product_id"),
           supabaseAdmin.from("pos_sale_items").select("product_id"),
@@ -44,7 +44,17 @@ export async function GET(request: Request) {
         has_records: usedProductIds.has(p.id),
       }));
 
-      return NextResponse.json({ data: withHasRecords });
+      return NextResponse.json(
+        { data: withHasRecords },
+        {
+          headers: {
+            "Cache-Control":
+              "no-store, no-cache, must-revalidate, proxy-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        },
+      );
     }
 
     let query = supabaseAdmin
@@ -65,7 +75,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ data: data || [] });
+    return NextResponse.json(
+      { data: data || [] },
+      {
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      },
+    );
   } catch (err: any) {
     console.error("[API /api/pos/products] Unexpected error:", err);
     return NextResponse.json(
@@ -75,13 +95,12 @@ export async function GET(request: Request) {
   }
 }
 
-// POST /api/pos/products { name, unit?, low_stock_threshold? } -> reuses an
+// POST /api/pos/products { name, unit? } -> reuses an
 // existing case-insensitive match if one exists, otherwise creates a new
 // product. Never creates a duplicate: `name` is a citext column, so equality
-// here is already case-insensitive at the database level. `unit` and
-// `low_stock_threshold` are optional so the purchase-entry autocomplete
-// (which only ever sends `name`) keeps working unchanged; the Inventory
-// page's "Add product" form sends all three.
+// here is already case-insensitive at the database level. `unit` is
+// optional so the purchase-entry autocomplete (which only ever sends `name`)
+// keeps working unchanged.
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -95,18 +114,6 @@ export async function POST(request: Request) {
       typeof body?.unit === "string" && body.unit.trim()
         ? body.unit.trim()
         : undefined;
-
-    let lowStockThreshold: number | undefined;
-    if (body?.low_stock_threshold !== undefined) {
-      const parsed = Number(body.low_stock_threshold);
-      if (!Number.isFinite(parsed) || parsed < 0) {
-        return NextResponse.json(
-          { error: "low_stock_threshold must be zero or greater" },
-          { status: 400 },
-        );
-      }
-      lowStockThreshold = parsed;
-    }
 
     const supabaseAdmin = getSupabaseAdmin();
 
@@ -127,8 +134,6 @@ export async function POST(request: Request) {
 
     const insertRow: Record<string, unknown> = { name };
     if (unit !== undefined) insertRow.unit = unit;
-    if (lowStockThreshold !== undefined)
-      insertRow.low_stock_threshold = lowStockThreshold;
 
     const { data, error } = await supabaseAdmin
       .from("pos_products")

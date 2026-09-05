@@ -45,6 +45,9 @@ import {
 export default function InventoryPage() {
   const [products, setProducts] = useState<PosProductRow[]>([]);
   const [suppliers, setSuppliers] = useState<PosSupplierRow[]>([]);
+  const [inventoryMap, setInventoryMap] = useState<Map<string, number>>(
+    new Map(),
+  );
 
   const [loading, setLoading] = useState(true);
 
@@ -72,10 +75,16 @@ export default function InventoryPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [productsData, suppliersData] = await Promise.all([
+    const [productsData, suppliersData, inventoryData] = await Promise.all([
       PosProductService.listAll(),
       PosSupplierService.listAll(),
+      PosInventoryService.list(),
     ]);
+    const invMap = new Map<string, number>();
+    for (const item of inventoryData) {
+      invMap.set(item.product_id, Number(item.quantity) || 0);
+    }
+    setInventoryMap(invMap);
     setProducts(productsData);
     setSuppliers(suppliersData);
     setLoading(false);
@@ -291,6 +300,20 @@ export default function InventoryPage() {
                         <div className="min-w-0">
                           <p className="font-semibold text-sm text-foreground truncate">
                             {product.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                            <span>Stock:</span>
+                            <span
+                              className={cn(
+                                "font-medium",
+                                (inventoryMap.get(product.id) ?? 0) <= 0
+                                  ? "text-red-500 font-semibold"
+                                  : "text-foreground",
+                              )}
+                            >
+                              {inventoryMap.get(product.id) ?? 0}{" "}
+                              {product.unit || "unit"}s
+                            </span>
                           </p>
                         </div>
                       </div>

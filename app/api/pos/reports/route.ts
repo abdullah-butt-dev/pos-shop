@@ -79,7 +79,7 @@ export async function GET(request: Request) {
       supabase
         .from("pos_inventory")
         .select(
-          "product_id, quantity, updated_at, pos_products(id, name, unit, low_stock_threshold, is_active)",
+          "product_id, quantity, updated_at, pos_products(id, name, unit, is_active)",
         ),
 
       supabase
@@ -110,6 +110,7 @@ export async function GET(request: Request) {
     const supplierPayments = supplierPaymentsResult.data || [];
     const inventory = inventoryResult.data || [];
 
+    // Revenue and profit are recognized on the original sale date. Customer payments are cash collections only and must never be counted as revenue or profit again.
     const salesWithProfit = sales.map((sale: any) => {
       const revenue = (sale.pos_sale_items || []).reduce(
         (sum: number, item: any) => sum + Number(item.line_total || 0),
@@ -165,14 +166,7 @@ export async function GET(request: Request) {
     const stockRows = inventory.map((row: any) => ({
       ...row,
       quantity: Number(row.quantity || 0),
-      low_stock_threshold: Number(row.pos_products?.low_stock_threshold || 0),
     }));
-
-    const lowStock = stockRows.filter(
-      (row: any) =>
-        row.pos_products?.is_active !== false &&
-        row.quantity <= row.low_stock_threshold,
-    );
 
     const salesTotal = salesWithProfit.reduce(
       (sum, sale: any) => sum + Number(sale.total_amount || 0),
@@ -218,15 +212,11 @@ export async function GET(request: Request) {
         supplier_payments: supplierPaymentTotal,
         receivables,
         payables,
-
         total_products: inventory.length,
-
         stock_units: stockRows.reduce(
           (sum: number, row: any) => sum + row.quantity,
           0,
         ),
-
-        low_stock_count: lowStock.length,
       },
 
       sales: salesWithProfit,
@@ -234,7 +224,6 @@ export async function GET(request: Request) {
       customer_payments: customerPayments,
       supplier_payments: supplierPayments,
       inventory: stockRows,
-      low_stock: lowStock,
     });
   } catch (err: any) {
     console.error("[API /api/pos/reports] Unexpected error:", err);

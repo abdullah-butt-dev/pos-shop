@@ -12,7 +12,7 @@ import { CartProvider, useCart } from "@/components/pos/cart-context";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { OrdersLoadingSkeleton } from "@/components/pos/loading-skeleton";
 import { PageTransition } from "@/components/ui/page-transition";
-import { Clock, ShoppingBag } from "lucide-react";
+import { Clock, RefreshCw, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
@@ -49,6 +49,7 @@ function OrdersContent({
   setSearchQuery,
   time,
   loadProducts,
+  refreshing = false,
 }: {
   filteredProducts: PosProduct[];
   purchaseHistoryMap: Record<string, PurchaseHistoryEntry[]>;
@@ -56,6 +57,7 @@ function OrdersContent({
   setSearchQuery: (query: string) => void;
   time: Date | null;
   loadProducts: () => Promise<void>;
+  refreshing?: boolean;
 }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
 
@@ -72,28 +74,43 @@ function OrdersContent({
               <SearchBar onSearch={setSearchQuery} />
             </div>
 
-            {time && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground bg-[var(--pos-panel-2)] border border-[var(--pos-stroke)] rounded-lg font-medium shadow-sm shrink-0 whitespace-nowrap">
-                <Clock className="w-3.5 h-3.5 text-[var(--pos-brand)]" />
+            <div className="flex items-center gap-2">
+              {time && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground bg-[var(--pos-panel-2)] border border-[var(--pos-stroke)] rounded-lg font-medium shadow-sm shrink-0 whitespace-nowrap">
+                  <Clock className="w-3.5 h-3.5 text-[var(--pos-brand)]" />
 
-                <span>
-                  {time.toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </span>
+                  <span>
+                    {time.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
 
-                <span className="text-muted-foreground/30">•</span>
+                  <span className="text-muted-foreground/30">•</span>
 
-                <span>
-                  {time.toLocaleTimeString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                    hour12: true,
-                  })}
-                </span>
-              </div>
-            )}
+                  <span>
+                    {time.toLocaleTimeString("en-US", {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}
+                  </span>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => loadProducts()}
+                disabled={refreshing}
+                className="pos-panel rounded-lg p-2 hover:bg-foreground/5 transition text-muted-foreground hover:text-foreground disabled:opacity-50"
+                title="Refresh products and stock"
+                aria-label="Refresh products and stock"
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`}
+                />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-600 dark:scrollbar-thumb-gray-400">
@@ -179,15 +196,18 @@ export default function OrdersPage() {
 
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
-  const loadProducts = useCallback(async () => {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadProducts = useCallback(async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
+      setRefreshing(true);
 
       const [productsResponse, inventoryResponse, purchasesResponse] =
         await Promise.all([
-          fetch("/api/pos/products"),
-          fetch("/api/pos/inventory"),
-          fetch("/api/pos/purchases"),
+          fetch("/api/pos/products", { cache: "no-store" }),
+          fetch("/api/pos/inventory", { cache: "no-store" }),
+          fetch("/api/pos/purchases", { cache: "no-store" }),
         ]);
 
       const productsJson = await productsResponse.json();
@@ -318,11 +338,29 @@ export default function OrdersPage() {
       setPurchaseHistoryMap({});
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
     loadProducts();
+
+    const onFocus = () => {
+      loadProducts(true);
+    };
+
+    window.addEventListener("focus", onFocus);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadProducts(true);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [loadProducts]);
 
   const filteredProducts = useMemo(() => {
@@ -351,6 +389,7 @@ export default function OrdersPage() {
           setSearchQuery={setSearchQuery}
           time={time}
           loadProducts={loadProducts}
+          refreshing={refreshing}
         />
       </CartProvider>
     </PageTransition>

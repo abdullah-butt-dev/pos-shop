@@ -68,7 +68,6 @@ export interface PosProductRow {
   id: string;
   name: string;
   unit: string;
-  low_stock_threshold: number;
   is_active: boolean;
   created_at?: string;
 }
@@ -76,13 +75,11 @@ export interface PosProductRow {
 export interface PosProductCreateInput {
   name: string;
   unit?: string;
-  low_stock_threshold?: number;
 }
 
 export interface PosProductUpdateInput {
   name?: string;
   unit?: string;
-  low_stock_threshold?: number;
   is_active?: boolean;
 }
 
@@ -98,7 +95,9 @@ export class PosProductService {
   // Full product catalog (active + inactive), used by the Inventory page.
   static async listAll(): Promise<PosProductRow[]> {
     try {
-      const res = await fetch("/api/pos/products?all=1");
+      const res = await fetch("/api/pos/products?all=1", {
+        cache: "no-store",
+      });
       const json = await res.json();
 
       if (!res.ok || json.error) {
@@ -204,7 +203,9 @@ export class PosSupplierService {
 
   static async listAll(): Promise<PosSupplierRow[]> {
     try {
-      const res = await fetch("/api/pos/suppliers?all=1");
+      const res = await fetch("/api/pos/suppliers?all=1", {
+        cache: "no-store",
+      });
       const json = await res.json();
 
       if (!res.ok || json.error) {
@@ -290,7 +291,9 @@ export interface PosPurchaseWithRelations extends PosPurchase {
 export class PosPurchaseService {
   static async list(): Promise<PosPurchaseWithRelations[]> {
     try {
-      const res = await fetch("/api/pos/purchases");
+      const res = await fetch("/api/pos/purchases", {
+        cache: "no-store",
+      });
       const json = await res.json();
 
       if (!res.ok || json.error) {
@@ -352,7 +355,9 @@ export interface PosInventoryRow extends PosInventory {
 export class PosInventoryService {
   static async list(): Promise<PosInventoryRow[]> {
     try {
-      const res = await fetch("/api/pos/inventory");
+      const res = await fetch("/api/pos/inventory", {
+        cache: "no-store",
+      });
       const json = await res.json();
 
       if (!res.ok || json.error) {
@@ -380,7 +385,6 @@ export interface PosBusinessSettingsRow {
   address: string | null;
   phone: string | null;
   invoice_prefix: string;
-  default_low_stock_threshold: number;
   tax_rate: number;
   updated_at: string;
 }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  AlertTriangle,
+  ArrowDownLeft,
   ArrowUpRight,
   CalendarDays,
   ChevronDown,
@@ -40,11 +40,9 @@ type DashboardData = {
     receivables: number;
     payables: number;
     stock_units: number;
-    low_stock_count: number;
     total_products?: number;
   };
   sales: any[];
-  low_stock: any[];
 };
 
 function getLocalDate() {
@@ -150,11 +148,12 @@ export default function DashboardPage() {
 
   const sales = data?.summary.sales || 0;
   const profit = data?.summary.profit || 0;
+  const customerPayments = data?.summary.customer_payments || 0;
+  const supplierPayments = data?.summary.supplier_payments || 0;
   const receivables = data?.summary.receivables || 0;
   const payables = data?.summary.payables || 0;
   const totalProducts = data?.summary?.total_products || 0;
   const stockUnits = data?.summary.stock_units || 0;
-  const lowStock = data?.low_stock || [];
 
   const recentSales = useMemo(() => {
     return data?.sales || [];
@@ -332,34 +331,33 @@ export default function DashboardPage() {
                 icon={ShoppingCart}
                 label="Sales"
                 value={money(sales, currency)}
-                description="Total sale revenue"
+                description="Recognized on sale date"
               />
               <StatCard
                 icon={TrendingUp}
                 label="Profit"
                 value={money(profit, currency)}
-                description="Revenue minus actual cost"
+                description="Revenue minus FIFO cost"
               />
               <StatCard
-                icon={Package}
-                label="Total Products"
-                value={totalProducts.toLocaleString("en-PK")}
-                description="Total active products in catalog"
-                href="/inventory"
+                icon={ArrowDownLeft}
+                label="Cash In (Customer)"
+                value={money(customerPayments, currency)}
+                description="Cash collected in period"
+                href="/receivables"
               />
               <StatCard
-                icon={AlertTriangle}
-                label="Low Stock"
-                value={String(lowStock.length)}
-                description="Products at or below threshold"
-                href="/inventory"
-                danger={lowStock.length > 0}
+                icon={ArrowUpRight}
+                label="Cash Out (Supplier)"
+                value={money(supplierPayments, currency)}
+                description="Cash paid in period"
+                href="/payables"
               />
             </div>
           </section>
 
-          {/* Financials Summary */}
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Financial Balances & Catalog Summary */}
+          <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <BalanceCard
               title="Total Customer Receivables"
               value={money(receivables, currency)}
@@ -369,6 +367,11 @@ export default function DashboardPage() {
               title="Total Supplier Payables"
               value={money(payables, currency)}
               href="/payables"
+            />
+            <BalanceCard
+              title="Total Products in Catalog"
+              value={totalProducts.toLocaleString("en-PK")}
+              href="/inventory"
             />
           </section>
 

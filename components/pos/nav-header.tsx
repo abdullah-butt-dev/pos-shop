@@ -30,7 +30,7 @@ import {
 const navItems = [
   { icon: ShoppingCart, label: "New Sale", href: "/orders" },
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-  { icon: Truck, label: "Inventory & Purchases", href: "/purchases" },
+  { icon: Truck, label: "Purchases", href: "/purchases" },
   { icon: Package, label: "Products & Suppliers", href: "/inventory" },
   { icon: Wallet, label: "Payables", href: "/payables" },
   { icon: Users, label: "Receivables", href: "/receivables" },
@@ -42,7 +42,6 @@ function getPageTitle(pathname: string): string {
   if (match) return match.label;
   if (pathname === "/") return "Home";
   if (pathname === "/bill-history") return "Bill History";
-  if (pathname === "/financials") return "Dashboard";
   if (pathname === "/login") return "Sign In";
   return "Perfect Traders";
 }

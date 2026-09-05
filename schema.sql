@@ -32,7 +32,6 @@ CREATE TABLE IF NOT EXISTS pos_products (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name                 CITEXT NOT NULL,
   unit                 TEXT NOT NULL DEFAULT 'pcs',
-  low_stock_threshold  NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (low_stock_threshold >= 0),
   is_active            BOOLEAN NOT NULL DEFAULT TRUE,
   created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -185,7 +184,6 @@ CREATE TABLE IF NOT EXISTS pos_business_settings (
   address                       TEXT,
   phone                         TEXT,
   invoice_prefix                TEXT NOT NULL DEFAULT 'PT',
-  default_low_stock_threshold   NUMERIC(12,2) NOT NULL DEFAULT 5,
   tax_rate                      NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (tax_rate >= 0),
   updated_at                    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT pos_business_settings_singleton CHECK (id)
