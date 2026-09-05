@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   LayoutDashboard,
@@ -8,9 +8,9 @@ import {
   Truck,
   Users,
   Wallet,
-} from "lucide-react"
-import Link from "next/link"
-import { NavHeader } from "@/components/pos/nav-header"
+} from "lucide-react";
+import Link from "next/link";
+import { NavHeader } from "@/components/pos/nav-header";
 
 const sectionCards = [
   {
@@ -50,7 +50,8 @@ const sectionCards = [
     title: "Receivables",
     description: "Track and collect customer outstanding amounts",
     href: "/receivables",
-    color: "bg-[var(--pos-accent-purple)]/15 text-[var(--pos-accent-purple-text)]",
+    color:
+      "bg-[var(--pos-accent-purple)]/15 text-[var(--pos-accent-purple-text)]",
     borderColor: "border-[var(--pos-accent-purple)]/30",
   },
   {
@@ -61,7 +62,7 @@ const sectionCards = [
     color: "bg-foreground/5 text-muted-foreground",
     borderColor: "border-foreground/10",
   },
-]
+];
 
 export default function HomePage() {
   return (
@@ -78,6 +79,7 @@ export default function HomePage() {
           {/* New Sale — Primary Action */}
           <Link
             href="/orders"
+            prefetch={true}
             className="block w-full pos-panel rounded-2xl p-5 sm:p-6 hover:shadow-lg transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] group"
           >
             <div className="flex items-center gap-4">
@@ -99,6 +101,7 @@ export default function HomePage() {
               <Link
                 key={card.href}
                 href={card.href}
+                prefetch={true}
                 className="pos-panel rounded-xl p-4 sm:p-5 hover:shadow-md transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] group"
               >
                 <div className="flex items-start gap-3">
@@ -122,5 +125,5 @@ export default function HomePage() {
         </div>
       </div>
     </main>
-  )
+  );
 }

@@ -5,46 +5,6 @@ import { User, Session } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase"
 import { useRouter, usePathname } from "next/navigation"
 
-// This app is single-user (see business rules: one authenticated application
-// user only, no roles, no signup). The mock user below is only a local
-// fallback so the app remains usable before real Supabase credentials/user
-// are configured — it is not a role or multi-account system.
-const mockUser: User = {
-  id: "00000000-0000-0000-0000-000000000000",
-  email: "owner@perfecttraders.com",
-  app_metadata: {},
-  user_metadata: {
-    full_name: "Owner",
-  },
-  aud: "authenticated",
-  created_at: new Date().toISOString()
-}
-
-const getPersistedMockUser = (): User => {
-  if (typeof window === 'undefined') return mockUser
-  try {
-    const savedName = localStorage.getItem('pt_owner_name')
-    if (savedName) {
-      // Strip legacy bracket role suffix
-      const cleanName = savedName.replace(/\s*\([^)]+\)\s*$/, '').trim()
-      // Persist the cleaned name back to remove old format
-      if (cleanName !== savedName) {
-        localStorage.setItem('pt_owner_name', cleanName)
-      }
-      return {
-        ...mockUser,
-        user_metadata: {
-          ...mockUser.user_metadata,
-          full_name: cleanName
-        }
-      }
-    }
-  } catch (e) {
-    console.warn(e)
-  }
-  return mockUser
-}
-
 interface AuthContextType {
   user: User | null
   session: Session | null
@@ -73,22 +33,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const getInitialSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        if (session) {
+        if (session?.user) {
           setSession(session)
           setUser(session.user)
         } else {
-          setUser(getPersistedMockUser())
-          setSession({
-            access_token: "mock-token",
-            token_type: "bearer",
-            expires_in: 3600,
-            refresh_token: "mock-refresh",
-            user: getPersistedMockUser(),
-          })
+          setSession(null)
+          setUser(null)
         }
       } catch (error) {
         console.error("Error getting initial session:", error)
-        setUser(getPersistedMockUser())
+        setSession(null)
+        setUser(null)
       } finally {
         setLoading(false)
       }
@@ -96,26 +51,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     getInitialSession()
 
-    // Safety timeout: stop loading spinner after 1.5s in case of slow/blocked network
+    // Safety timeout: stop loading spinner after 2s in case of network latency
     const timer = setTimeout(() => {
       setLoading(false)
-    }, 1500)
+    }, 2000)
 
     // 2. Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        if (session) {
+        if (session?.user) {
           setSession(session)
           setUser(session.user)
         } else {
-          setUser(getPersistedMockUser())
-          setSession({
-            access_token: "mock-token",
-            token_type: "bearer",
-            expires_in: 3600,
-            refresh_token: "mock-refresh",
-            user: getPersistedMockUser(),
-          })
+          setSession(null)
+          setUser(null)
         }
         setLoading(false)
       }
@@ -127,12 +76,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [])
 
-  // Auto redirection for the /login route if logged in
+  // Auto redirection guard
   useEffect(() => {
     if (loading) return
 
-    if (user && pathname === "/login") {
-      router.push("/")
+    if (!user && pathname !== "/login") {
+      router.replace("/login")
+    } else if (user && pathname === "/login") {
+      router.replace("/")
     }
   }, [user, loading, pathname, router])
 
@@ -140,48 +91,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setLoading(true)
     try {
       await supabase.auth.signOut()
-      router.push("/")
+      setUser(null)
+      setSession(null)
+      router.replace("/login")
     } catch (error) {
       console.error("Error signing out:", error)
+      router.replace("/login")
     } finally {
       setLoading(false)
     }
   }
 
   const updateProfileName = async (name: string) => {
-    if (session && session.user && session.user.id !== "00000000-0000-0000-0000-000000000000") {
-      const { data, error } = await supabase.auth.updateUser({
-        data: { full_name: name }
-      })
-      if (error) throw error
-      if (data && data.user) {
-        setUser(data.user)
-      }
-    } else {
-      localStorage.setItem('pt_owner_name', name)
-      setUser(prev => {
-        const baseUser = prev || getPersistedMockUser()
-        return {
-          ...baseUser,
-          user_metadata: {
-            ...baseUser.user_metadata,
-            full_name: name
-          }
-        }
-      })
+    if (!user) return
+
+    const { data, error } = await supabase.auth.updateUser({
+      data: { full_name: name }
+    })
+    if (error) throw error
+    if (data && data.user) {
+      setUser(data.user)
     }
   }
 
-  if (loading) {
+  // Show loading spinner while determining auth state or redirecting unauthenticated users
+  if (loading || (!user && pathname !== "/login")) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[var(--pos-panel-2)]">
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-[var(--pos-panel-2)] text-foreground gap-3">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--pos-brand)]"></div>
+        <p className="text-xs text-muted-foreground">Checking authentication...</p>
       </div>
     )
   }
 
   return (
-    <AuthContext.Provider value={{ user: user || getPersistedMockUser(), session, loading, signOut, updateProfileName }}>
+    <AuthContext.Provider value={{ user, session, loading, signOut, updateProfileName }}>
       {children}
     </AuthContext.Provider>
   )

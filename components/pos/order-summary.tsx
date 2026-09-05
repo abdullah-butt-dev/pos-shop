@@ -216,7 +216,7 @@ export function OrderSummary({
   };
 
   return (
-    <aside className="pos-panel w-96 shrink-0 p-4 flex flex-col gap-4 h-full">
+    <div className="pos-panel w-full shrink-0 p-3 sm:p-4 flex flex-col gap-4 h-full bg-[var(--pos-panel)] rounded-xl sm:rounded-none">
       <header className="flex items-center gap-2 shrink-0 pb-2 border-b border-[var(--pos-stroke)]">
         <ShoppingBag className="w-4 h-4 text-[var(--pos-brand-text)]" />
         <span className="text-sm font-semibold">New Sale</span>
@@ -255,7 +255,7 @@ export function OrderSummary({
           <div className="flex-1 overflow-y-auto scrollbar-thin pr-1 min-h-0">
             <div className="grid gap-3">
               {items.map((item, index) => (
-                <div key={item.id} className="pos-panel rounded-xl p-3">
+                <div key={item.id} className="pos-panel rounded-xl p-3 bg-foreground/[0.02]">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="pos-panel h-6 w-6 shrink-0 rounded-full grid place-items-center text-xs font-medium">
@@ -311,7 +311,7 @@ export function OrderSummary({
                         <button
                           type="button"
                           onClick={() => dec(item.id)}
-                          className="pos-panel rounded-lg w-9 h-9 flex items-center justify-center"
+                          className="bg-foreground/5 hover:bg-foreground/10 rounded-lg w-9 h-9 flex items-center justify-center transition"
                           aria-label={`Decrease ${item.name}`}
                         >
                           <Minus className="w-3.5 h-3.5" />
@@ -319,23 +319,28 @@ export function OrderSummary({
 
                         <input
                           type="number"
-                          min="1"
+                          min="0"
                           step="1"
-                          value={item.qty}
+                          value={item.qty === 0 ? "" : item.qty}
                           onChange={(event) => {
-                            const value = Number(event.target.value);
-
-                            if (Number.isFinite(value)) {
-                              setQty(item.id, value);
+                            const val = event.target.value;
+                            if (val === "") {
+                              setQty(item.id, 0);
+                            } else {
+                              const value = Number(val);
+                              if (Number.isFinite(value)) {
+                                setQty(item.id, value);
+                              }
                             }
                           }}
-                          className="w-full bg-foreground/5 border border-foreground/10 rounded-lg px-2 py-2 text-center text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand"
+                          onFocus={(e) => e.target.select()}
+                          className="w-full bg-foreground/5 border border-foreground/10 rounded-lg px-2 py-2 text-center text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand font-medium"
                         />
 
                         <button
                           type="button"
                           onClick={() => inc(item.id)}
-                          className="pos-panel rounded-lg w-9 h-9 flex items-center justify-center"
+                          className="bg-foreground/5 hover:bg-foreground/10 rounded-lg w-9 h-9 flex items-center justify-center transition"
                           aria-label={`Increase ${item.name}`}
                         >
                           <Plus className="w-3.5 h-3.5" />
@@ -349,9 +354,8 @@ export function OrderSummary({
                       Line total
                     </span>
 
-                    <span className="font-semibold">
-                      Rs.
-                      {(item.price * item.qty).toFixed(2)}
+                    <span className="font-semibold text-sm">
+                      Rs. {(item.price * item.qty).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -359,27 +363,27 @@ export function OrderSummary({
             </div>
           </div>
 
-          <div className="shrink-0 space-y-4">
-            <div className="pos-panel rounded-xl p-4 space-y-4">
+          <div className="shrink-0 space-y-4 pt-2 border-t border-[var(--pos-stroke)]">
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="font-medium">Grand Total</span>
+                <span className="font-medium text-sm">Grand Total</span>
 
-                <span className="text-xl font-bold">
-                  Rs.{subtotal.toFixed(2)}
+                <span className="text-2xl font-bold text-[var(--pos-brand-text)]">
+                  Rs. {subtotal.toFixed(2)}
                 </span>
               </div>
 
               <div>
-                <label className="text-xs text-muted-foreground">Payment</label>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Payment Mode</label>
 
                 <div className="grid grid-cols-3 gap-2 mt-2">
                   <button
                     type="button"
                     onClick={() => selectPaymentMode("paid")}
-                    className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${
+                    className={`rounded-xl px-2 py-2.5 text-sm font-semibold transition border ${
                       paymentMode === "paid"
-                        ? "bg-pos-brand text-black"
-                        : "bg-foreground/5 hover:bg-foreground/10"
+                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                        : "bg-foreground/5 border-transparent text-muted-foreground hover:bg-foreground/10"
                     }`}
                   >
                     Paid
@@ -388,10 +392,10 @@ export function OrderSummary({
                   <button
                     type="button"
                     onClick={() => selectPaymentMode("partial")}
-                    className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${
+                    className={`rounded-xl px-2 py-2.5 text-sm font-semibold transition border ${
                       paymentMode === "partial"
-                        ? "bg-pos-brand text-black"
-                        : "bg-foreground/5 hover:bg-foreground/10"
+                        ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                        : "bg-foreground/5 border-transparent text-muted-foreground hover:bg-foreground/10"
                     }`}
                   >
                     Partial
@@ -400,10 +404,10 @@ export function OrderSummary({
                   <button
                     type="button"
                     onClick={() => selectPaymentMode("credit")}
-                    className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${
+                    className={`rounded-xl px-2 py-2.5 text-sm font-semibold transition border ${
                       paymentMode === "credit"
-                        ? "bg-pos-brand text-black"
-                        : "bg-foreground/5 hover:bg-foreground/10"
+                        ? "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400"
+                        : "bg-foreground/5 border-transparent text-muted-foreground hover:bg-foreground/10"
                     }`}
                   >
                     Credit
@@ -411,52 +415,53 @@ export function OrderSummary({
                 </div>
               </div>
 
-              <div>
-                <label
-                  htmlFor="pos-paid-amount"
-                  className="text-xs text-muted-foreground"
-                >
-                  Paid amount
-                </label>
+              {paymentMode === "partial" && (
+                <div>
+                  <label
+                    htmlFor="pos-paid-amount"
+                    className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block"
+                  >
+                    Amount Paid
+                  </label>
 
-                <div className="relative mt-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs">
-                    Rs.
-                  </span>
+                  <div className="relative mt-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium">
+                      Rs.
+                    </span>
 
-                  <input
-                    id="pos-paid-amount"
-                    type="number"
-                    min="0"
-                    max={subtotal}
-                    step="0.01"
-                    value={paidAmount}
-                    onChange={(event) =>
-                      handlePaidAmountChange(event.target.value)
-                    }
-                    className="w-full bg-foreground/5 border border-foreground/10 rounded-lg pl-9 pr-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand"
-                    aria-label="Paid amount"
-                  />
+                    <input
+                      id="pos-paid-amount"
+                      type="number"
+                      min="0"
+                      max={subtotal}
+                      step="0.01"
+                      value={paidAmount}
+                      onChange={(event) =>
+                        handlePaidAmountChange(event.target.value)
+                      }
+                      className="w-full bg-foreground/5 border border-foreground/10 rounded-xl pl-9 pr-3 py-2.5 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand font-semibold"
+                      aria-label="Paid amount"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Remaining</span>
+              <div className="flex items-center justify-between text-sm pt-2">
+                <span className="text-muted-foreground font-medium">Remaining Due</span>
 
                 <span
                   className={
                     remaining > 0.009
-                      ? "font-semibold text-amber-500"
-                      : "font-semibold text-emerald-500"
+                      ? "font-bold text-amber-500 text-lg"
+                      : "font-bold text-emerald-500 text-lg"
                   }
                 >
-                  Rs.
-                  {Math.max(remaining, 0).toFixed(2)}
+                  Rs. {Math.max(remaining, 0).toFixed(2)}
                 </span>
               </div>
 
               {remaining > 0.009 && !customer && (
-                <p className="text-xs text-amber-500">
+                <p className="text-xs text-amber-500 font-medium">
                   Select a customer to save a credit or partial payment.
                 </p>
               )}
@@ -568,6 +573,6 @@ export function OrderSummary({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </aside>
+    </div>
   );
 }

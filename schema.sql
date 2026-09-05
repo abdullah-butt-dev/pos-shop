@@ -207,11 +207,18 @@ CREATE OR REPLACE FUNCTION pos_adjust_inventory(
 DECLARE
   v_balance NUMERIC(12,2);
 BEGIN
+  -- First ensure row exists in pos_inventory with 0 quantity if not present yet.
+  -- Inserting 0 never violates pos_inventory_quantity_non_negative.
   INSERT INTO pos_inventory (product_id, quantity)
-  VALUES (p_product_id, p_delta)
-  ON CONFLICT (product_id) DO UPDATE
-    SET quantity = pos_inventory.quantity + EXCLUDED.quantity,
-        updated_at = NOW()
+  VALUES (p_product_id, 0)
+  ON CONFLICT (product_id) DO NOTHING;
+
+  -- Update quantity safely; the table CHECK constraint pos_inventory_quantity_non_negative
+  -- ensures final quantity >= 0 and raises an error if an oversell is attempted.
+  UPDATE pos_inventory
+  SET quantity = pos_inventory.quantity + p_delta,
+      updated_at = NOW()
+  WHERE product_id = p_product_id
   RETURNING quantity INTO v_balance;
 
   INSERT INTO pos_inventory_movements

@@ -3,7 +3,14 @@
 import type React from "react";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, PackageCheck, Plus, Trash2, Truck } from "lucide-react";
+import {
+  Loader2,
+  PackageCheck,
+  Plus,
+  Trash2,
+  Truck,
+  ChevronDown,
+} from "lucide-react";
 import { toast } from "sonner";
 import { NavHeader } from "@/components/pos/nav-header";
 import {
@@ -17,13 +24,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import {
   PosInventoryService,
   PosProductService,
@@ -65,7 +65,7 @@ export default function PurchasesPage() {
   const [amountPaid, setAmountPaid] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("stock");
 
   const [purchases, setPurchases] = useState<PosPurchaseWithRelations[]>([]);
   const [purchasesLoading, setPurchasesLoading] = useState(true);
@@ -154,15 +154,25 @@ export default function PurchasesPage() {
       return;
     }
 
+
+    const totalCost = items.reduce((sum, item) => sum + item.quantity * item.unit_cost, 0);
+    let finalAmountPaid = 0;
+    if (paymentMethod === "Paid") {
+      finalAmountPaid = totalCost;
+    } else if (paymentMethod === "Partial") {
+      finalAmountPaid = Number(amountPaid) || 0;
+    }
+
     setSubmitting(true);
     try {
       const result = await PosPurchaseService.create({
         supplier_id: supplier.id,
         purchase_date: purchaseDate,
         items,
-        amount_paid: Number(amountPaid) || 0,
+        amount_paid: finalAmountPaid,
         payment_method: paymentMethod.trim() || undefined,
       });
+
 
       if (!result) {
         toast.error("Failed to save purchase. Please try again.");
@@ -171,7 +181,7 @@ export default function PurchasesPage() {
 
       toast.success("Purchase saved");
       resetForm();
-      setDialogOpen(false);
+      setActiveTab("stock");
       loadPurchases();
       loadInventory();
     } finally {
@@ -191,26 +201,212 @@ export default function PurchasesPage() {
                 Record stock purchases from suppliers
               </p>
             </div>
+          </div>
 
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <button className="flex items-center gap-2 px-4 py-2.5 bg-pos-brand text-black font-bold rounded-xl active:scale-[0.98] transition cursor-pointer shadow-sm hover:opacity-90">
-                  <Plus className="w-4 h-4" />
-                  Add Purchase
-                </button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-[var(--pos-panel)]">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Truck className="w-5 h-5" />
-                    New Purchase
-                  </DialogTitle>
-                </DialogHeader>
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
+            <TabsList className="mb-4 flex-wrap h-auto">
+              <TabsTrigger value="stock" className="flex-1 sm:flex-none">
+                <PackageCheck className="w-4 h-4 mr-1.5" />
+                Current Stock
+              </TabsTrigger>
+              <TabsTrigger value="purchases" className="flex-1 sm:flex-none">
+                <Truck className="w-4 h-4 mr-1.5" />
+                Recent Purchases
+              </TabsTrigger>
+              <TabsTrigger value="add" className="flex-1 sm:flex-none">
+                <Plus className="w-4 h-4 mr-1.5" />
+                Add Purchase
+              </TabsTrigger>
+            </TabsList>
 
-                <form
-                  onSubmit={handleSubmit}
-                  className="flex flex-col gap-5 pt-2"
-                >
+            <TabsContent value="stock">
+              <div className="pos-panel rounded-lg p-4">
+                {inventory.length === 0 ? (
+                  <div className="text-center py-8">
+                    <PackageCheck className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+                    <p className="text-sm text-muted-foreground">
+                      No stock yet. Add purchases to build inventory.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {inventory.map((inv) => {
+                      const history = purchases
+                        .flatMap((p) =>
+                          p.pos_purchase_items
+                            .filter((i) => i.product_id === inv.product_id)
+                            .map((i) => ({
+                              id: p.id + i.id,
+                              date: p.purchase_date,
+                              supplier: p.pos_suppliers?.name || "Unknown",
+                              qty: i.quantity,
+                              price: i.unit_cost,
+                              payment:
+                                p.payment_status || "Paid",
+                              paid: p.amount_paid,
+                              due: p.amount_due,
+                            })),
+                        )
+                        .sort(
+                          (a, b) =>
+                            new Date(b.date).getTime() -
+                            new Date(a.date).getTime(),
+                        );
+
+                      return (
+                        <details
+                          key={inv.product_id}
+                          className="group p-4 rounded-xl bg-foreground/[0.02] border border-[var(--pos-stroke)] transition-all"
+                        >
+                          <summary className="flex items-center justify-between cursor-pointer list-none focus:outline-none">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-sm font-semibold truncate">
+                                {inv.pos_products?.name || "—"}
+                              </span>
+                              <span className="text-2xl font-bold text-[var(--pos-brand-text)]">
+                                {inv.quantity}{" "}
+                                <span className="text-xs text-muted-foreground font-normal">
+                                  {inv.pos_products?.unit}
+                                </span>
+                              </span>
+                            </div>
+                            <div className="text-muted-foreground bg-foreground/5 p-2 rounded-lg group-open:rotate-180 transition-transform">
+                              <ChevronDown className="w-4 h-4" />
+                            </div>
+                          </summary>
+                          <div className="mt-4 pt-3 border-t border-[var(--pos-stroke)] space-y-2">
+                            {history.length === 0 ? (
+                              <p className="text-xs text-muted-foreground text-center py-2">
+                                No purchase history
+                              </p>
+                            ) : (
+                              history.map((h) => (
+                                <div
+                                  key={h.id}
+                                  className="text-xs bg-foreground/5 p-3 rounded-lg border border-foreground/5"
+                                >
+                                  <div className="flex justify-between font-semibold mb-1.5">
+                                    <span className="text-foreground/80">
+                                      {h.date} • {h.supplier}
+                                    </span>
+                                    <span>
+                                      {h.qty} @ Rs.{h.price}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between text-muted-foreground font-medium">
+                                    <span className="capitalize">
+                                      {h.payment} (Paid: Rs.{h.paid || 0})
+                                    </span>
+                                    {Number(h.due) > 0 && (
+                                      <span className="text-amber-500">
+                                        Due: Rs.{h.due}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="purchases">
+              <div className="pos-panel rounded-lg p-4">
+                {purchasesLoading ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Loading...
+                  </p>
+                ) : purchases.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Truck className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+                    <p className="text-sm text-muted-foreground">
+                      No purchases yet.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider border-b border-[var(--pos-stroke)]">
+                          <th className="py-2 pr-3">Date</th>
+                          <th className="py-2 pr-3">Supplier</th>
+                          <th className="py-2 pr-3">Items</th>
+                          <th className="py-2 pr-3 text-right">Total</th>
+                          <th className="py-2 pr-3 text-right">Paid</th>
+                          <th className="py-2 pr-3 text-right">Due</th>
+                          <th className="py-2 text-right">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {purchases.map((p) => (
+                          <tr
+                            key={p.id}
+                            className="border-b border-[var(--pos-stroke)]/50 align-top"
+                          >
+                            <td className="py-2 pr-3 whitespace-nowrap">
+                              {p.purchase_date}
+                            </td>
+                            <td className="py-2 pr-3 whitespace-nowrap">
+                              {p.pos_suppliers?.name || "—"}
+                            </td>
+                            <td className="py-2 pr-3">
+                              <ul className="space-y-0.5">
+                                {p.pos_purchase_items.map((it) => (
+                                  <li
+                                    key={it.id}
+                                    className="text-xs text-muted-foreground whitespace-nowrap"
+                                  >
+                                    {it.pos_products?.name || "—"} ×{" "}
+                                    {it.quantity} @ Rs.{it.unit_cost}
+                                  </li>
+                                ))}
+                              </ul>
+                            </td>
+                            <td className="py-2 pr-3 text-right whitespace-nowrap">
+                              {formatMoney(Number(p.total_amount) || 0)}
+                            </td>
+                            <td className="py-2 pr-3 text-right whitespace-nowrap">
+                              {formatMoney(Number(p.amount_paid) || 0)}
+                            </td>
+                            <td className="py-2 pr-3 text-right whitespace-nowrap">
+                              {formatMoney(Number(p.amount_due) || 0)}
+                            </td>
+                            <td className="py-2 text-right whitespace-nowrap">
+                              <span
+                                className={cn(
+                                  "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase",
+                                  p.payment_status === "paid" &&
+                                    "bg-emerald-500/10 text-emerald-500",
+                                  p.payment_status === "partial" &&
+                                    "bg-amber-500/10 text-amber-500",
+                                  p.payment_status === "unpaid" &&
+                                    "bg-red-500/10 text-red-500",
+                                )}
+                              >
+                                {p.payment_status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="add">
+              <div className="pos-panel rounded-lg p-4">
+                <form onSubmit={handleSubmit} className="flex flex-col gap-5">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <AutocompleteField
                       id="supplier"
@@ -464,11 +660,11 @@ export default function PurchasesPage() {
                     </div>
                   )}
 
-                  <div className="flex justify-end pt-2 border-t border-[var(--pos-stroke)]">
+                  <div className="flex justify-end pt-4 border-t border-[var(--pos-stroke)] mt-2">
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="px-6 py-3 rounded-xl bg-pos-brand text-black text-sm font-bold transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-[var(--pos-brand)]/10 flex items-center gap-2"
+                      className="w-full sm:w-auto px-6 py-3 rounded-xl bg-pos-brand text-black text-sm font-bold transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-[var(--pos-brand)]/10 flex items-center justify-center gap-2"
                     >
                       {submitting && (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -477,137 +673,6 @@ export default function PurchasesPage() {
                     </button>
                   </div>
                 </form>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {/* Two Tab Layout: Current Stock + Recent Purchases */}
-          <Tabs defaultValue="stock" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="stock">
-                <PackageCheck className="w-4 h-4 mr-1.5" />
-                Current Stock
-              </TabsTrigger>
-              <TabsTrigger value="purchases">
-                <Truck className="w-4 h-4 mr-1.5" />
-                Recent Purchases
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="stock">
-              <div className="pos-panel rounded-lg p-4">
-                {inventory.length === 0 ? (
-                  <div className="text-center py-8">
-                    <PackageCheck className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
-                    <p className="text-sm text-muted-foreground">
-                      No stock yet. Add purchases to build inventory.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                    {inventory.map((inv) => (
-                      <div
-                        key={inv.product_id}
-                        className="p-3 rounded-lg bg-foreground/[0.02] border border-[var(--pos-stroke)] flex flex-col gap-1"
-                      >
-                        <span className="text-sm font-semibold truncate">
-                          {inv.pos_products?.name || "—"}
-                        </span>
-                        <span className="text-2xl font-bold text-[var(--pos-brand-text)]">
-                          {inv.quantity}{" "}
-                          <span className="text-xs text-muted-foreground font-normal">
-                            {inv.pos_products?.unit}
-                          </span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="purchases">
-              <div className="pos-panel rounded-lg p-4">
-                {purchasesLoading ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    Loading...
-                  </p>
-                ) : purchases.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Truck className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
-                    <p className="text-sm text-muted-foreground">
-                      No purchases yet.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider border-b border-[var(--pos-stroke)]">
-                          <th className="py-2 pr-3">Date</th>
-                          <th className="py-2 pr-3">Supplier</th>
-                          <th className="py-2 pr-3">Items</th>
-                          <th className="py-2 pr-3 text-right">Total</th>
-                          <th className="py-2 pr-3 text-right">Paid</th>
-                          <th className="py-2 pr-3 text-right">Due</th>
-                          <th className="py-2 text-right">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {purchases.map((p) => (
-                          <tr
-                            key={p.id}
-                            className="border-b border-[var(--pos-stroke)]/50 align-top"
-                          >
-                            <td className="py-2 pr-3 whitespace-nowrap">
-                              {p.purchase_date}
-                            </td>
-                            <td className="py-2 pr-3 whitespace-nowrap">
-                              {p.pos_suppliers?.name || "—"}
-                            </td>
-                            <td className="py-2 pr-3">
-                              <ul className="space-y-0.5">
-                                {p.pos_purchase_items.map((it) => (
-                                  <li
-                                    key={it.id}
-                                    className="text-xs text-muted-foreground whitespace-nowrap"
-                                  >
-                                    {it.pos_products?.name || "—"} ×{" "}
-                                    {it.quantity} @ Rs.{it.unit_cost}
-                                  </li>
-                                ))}
-                              </ul>
-                            </td>
-                            <td className="py-2 pr-3 text-right whitespace-nowrap">
-                              {formatMoney(Number(p.total_amount) || 0)}
-                            </td>
-                            <td className="py-2 pr-3 text-right whitespace-nowrap">
-                              {formatMoney(Number(p.amount_paid) || 0)}
-                            </td>
-                            <td className="py-2 pr-3 text-right whitespace-nowrap">
-                              {formatMoney(Number(p.amount_due) || 0)}
-                            </td>
-                            <td className="py-2 text-right whitespace-nowrap">
-                              <span
-                                className={cn(
-                                  "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase",
-                                  p.payment_status === "paid" &&
-                                    "bg-emerald-500/10 text-emerald-500",
-                                  p.payment_status === "partial" &&
-                                    "bg-amber-500/10 text-amber-500",
-                                  p.payment_status === "unpaid" &&
-                                    "bg-red-500/10 text-red-500",
-                                )}
-                              >
-                                {p.payment_status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
               </div>
             </TabsContent>
           </Tabs>

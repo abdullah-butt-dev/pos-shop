@@ -1,6 +1,7 @@
-"use client";
+const fs = require('fs');
+let content = fs.readFileSync('app/login/page.tsx', 'utf8');
 
-import { useState } from "react";
+const importReplacement = `import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import {
   KeyRound,
@@ -11,20 +12,16 @@ import {
   Eye,
   EyeOff,
   RefreshCcw,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
+} from "lucide-react";`;
+content = content.replace(/import \{ useState \} from "react";[\s\S]*?from "lucide-react";/, importReplacement);
 
-export default function LoginPage() {
+const componentStart = `export default function LoginPage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+  const [username, setUsername] = useState("");`;
+content = content.replace(/export default function LoginPage\(\) {\n  const \[username, setUsername\] = useState\(""\);/, componentStart);
 
-  const handleAuth = async (e: React.FormEvent) => {
+const handleAuthReplacement = `  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -38,7 +35,7 @@ export default function LoginPage() {
 
     const email = trimmedUser.includes("@")
       ? trimmedUser.toLowerCase()
-      : `${trimmedUser.toLowerCase()}@pos.com`;
+      : \`\${trimmedUser.toLowerCase()}@pos.com\`;
 
     try {
       const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -65,60 +62,10 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  };
+  };`;
+content = content.replace(/  const handleAuth = async \(e: React.FormEvent\) => \{[\s\S]*?  \};/, handleAuthReplacement);
 
-  return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[var(--pos-panel-2)] p-4 relative overflow-hidden">
-      {/* Decorative Mint Blur Orbs */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[var(--pos-brand)]/5 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[var(--pos-brand)]/5 rounded-full blur-[120px] pointer-events-none" />
-
-      {/* Login Card */}
-      <div className="w-full max-w-md pos-panel backdrop-blur-xl bg-[var(--pos-panel)]/80 border border-[var(--pos-stroke)] rounded-2xl p-8 shadow-2xl relative z-10 transition-all duration-300">
-        <div className="flex flex-col items-center mb-8 text-center">
-          <div className="h-12 w-12 rounded-xl bg-[var(--pos-brand)] flex items-center justify-center shadow-lg shadow-[var(--pos-brand)]/20 mb-4">
-            <Sparkles className="h-6 w-6 text-black font-bold" />
-          </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-            Perfect Traders
-          </h1>
-          <p className="text-xs text-muted-foreground mt-2">
-            Sign in to manage your shop
-          </p>
-        </div>
-
-        {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 text-red-700 dark:text-red-300 text-sm text-center shadow-sm">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleAuth} className="space-y-5">
-          <div className="space-y-2">
-            <label
-              htmlFor="login-username"
-              className="text-xs font-semibold text-muted-foreground tracking-wider uppercase block cursor-pointer"
-            >
-              Username or Email
-            </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-muted-foreground/60">
-                <Mail className="h-5 w-5" />
-              </span>
-              <input
-                id="login-username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-foreground/5 border border-foreground/10 rounded-xl pl-10 pr-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-[var(--pos-brand)] transition-all"
-                placeholder="admin"
-                autoComplete="username"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
+const newPasswordInput = `          <div className="space-y-2">
             <label
               htmlFor="login-password"
               className="text-xs font-semibold text-muted-foreground tracking-wider uppercase block cursor-pointer"
@@ -177,9 +124,10 @@ export default function LoginPage() {
                 />
               </div>
             </div>
-          )}
+          )}`;
+content = content.replace(/          <div className="space-y-2">\s*<label\s*htmlFor="login-password"[\s\S]*?<\/div>\s*<\/div>/, newPasswordInput);
 
-          <button
+const buttonReplacement = `          <button
             type="submit"
             disabled={loading}
             className="w-full h-12 flex items-center justify-center gap-2 bg-[var(--pos-brand)] hover:opacity-90 text-black font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-[var(--pos-brand)]/10 disabled:opacity-50 disabled:cursor-not-allowed mt-8 cursor-pointer"
@@ -202,9 +150,7 @@ export default function LoginPage() {
             >
               {isChangingPassword ? "Back to Login" : "Change Password"}
             </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+          </div>`;
+content = content.replace(/          <button\s*type="submit"[\s\S]*?<\/button>/, buttonReplacement);
+
+fs.writeFileSync('app/login/page.tsx', content);

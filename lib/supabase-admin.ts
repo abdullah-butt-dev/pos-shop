@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 // ----------------------------------------------------------------------
 // SERVER-ONLY client for the new beverage-shop (`pos_`) tables.
@@ -20,25 +20,27 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 // directly" — so nothing about Feature 2's schema/policies needs to change.
 // ----------------------------------------------------------------------
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://zrjbmaesmbqqgxknidea.supabase.co'
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  "https://stynbmxluovwisqogwre.supabase.co";
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-let cachedClient: SupabaseClient | null = null
+let cachedClient: SupabaseClient | null = null;
 
 export function getSupabaseAdmin(): SupabaseClient {
   if (!serviceRoleKey) {
     throw new Error(
-      'SUPABASE_SERVICE_ROLE_KEY is not set. Purchase entry writes to pos_ tables, which require ' +
-      'the `authenticated` role under RLS. Add SUPABASE_SERVICE_ROLE_KEY to .env.local ' +
-      '(Supabase Dashboard -> Project Settings -> API -> service_role key) and to your deployment env.'
-    )
+      "SUPABASE_SERVICE_ROLE_KEY is not set. Purchase entry writes to pos_ tables, which require " +
+        "the `authenticated` role under RLS. Add SUPABASE_SERVICE_ROLE_KEY to .env.local " +
+        "(Supabase Dashboard -> Project Settings -> API -> service_role key) and to your deployment env.",
+    );
   }
 
   if (!cachedClient) {
     cachedClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
-    })
+    });
   }
 
-  return cachedClient
+  return cachedClient;
 }

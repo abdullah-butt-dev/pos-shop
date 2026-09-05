@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -15,146 +15,148 @@ import {
   TrendingUp,
   Users,
   Wallet,
-} from "lucide-react"
+} from "lucide-react";
 
-import { NavHeader } from "@/components/pos/nav-header"
-import { generatePosReceiptPDF } from "@/lib/pos-receipt-pdf"
+import { NavHeader } from "@/components/pos/nav-header";
+import { generatePosReceiptPDF } from "@/lib/pos-receipt-pdf";
 
 type DashboardData = {
   settings: {
-    shop_name?: string
-    currency?: string
-    shop_address?: string
-    shop_phone?: string
-  }
+    shop_name?: string;
+    currency?: string;
+    shop_address?: string;
+    shop_phone?: string;
+  };
   summary: {
-    sales: number
-    profit: number
-    purchases: number
-    customer_payments: number
-    supplier_payments: number
-    receivables: number
-    payables: number
-    stock_units: number
-    low_stock_count: number
-  }
-  sales: any[]
-  low_stock: any[]
-}
+    sales: number;
+    profit: number;
+    purchases: number;
+    customer_payments: number;
+    supplier_payments: number;
+    receivables: number;
+    payables: number;
+    stock_units: number;
+    low_stock_count: number;
+  };
+  sales: any[];
+  low_stock: any[];
+};
 
 function getLocalDate() {
-  const date = new Date()
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function getWeekStart() {
-  const d = new Date()
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  const start = new Date(d.setDate(diff))
-  const year = start.getFullYear()
-  const month = String(start.getMonth() + 1).padStart(2, "0")
-  const dd = String(start.getDate()).padStart(2, "0")
-  return `${year}-${month}-${dd}`
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const start = new Date(d.setDate(diff));
+  const year = start.getFullYear();
+  const month = String(start.getMonth() + 1).padStart(2, "0");
+  const dd = String(start.getDate()).padStart(2, "0");
+  return `${year}-${month}-${dd}`;
 }
 
 function getMonthStart() {
-  const date = new Date()
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  return `${year}-${month}-01`
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}-01`;
 }
 
 function money(value: number, currency = "PKR") {
   return `${currency} ${Number(value || 0).toLocaleString("en-PK", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  })}`
+  })}`;
 }
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [dateFilter, setDateFilter] = useState<"today" | "week" | "month" | "custom">("today")
-  const [customFrom, setCustomFrom] = useState(getLocalDate())
-  const [customTo, setCustomTo] = useState(getLocalDate())
+  const [dateFilter, setDateFilter] = useState<
+    "today" | "week" | "month" | "custom"
+  >("today");
+  const [customFrom, setCustomFrom] = useState(getLocalDate());
+  const [customTo, setCustomTo] = useState(getLocalDate());
 
-  const [currentTime, setCurrentTime] = useState(new Date())
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   const loadDashboard = async () => {
     try {
-      setLoading(true)
-      setError("")
+      setLoading(true);
+      setError("");
 
-      let from = getLocalDate()
-      let to = getLocalDate()
+      let from = getLocalDate();
+      let to = getLocalDate();
 
       if (dateFilter === "week") {
-        from = getWeekStart()
+        from = getWeekStart();
       } else if (dateFilter === "month") {
-        from = getMonthStart()
+        from = getMonthStart();
       } else if (dateFilter === "custom") {
-        from = customFrom
-        to = customTo
+        from = customFrom;
+        to = customTo;
       }
 
-      const response = await fetch(`/api/pos/reports?from=${from}&to=${to}`)
-      const json = await response.json()
+      const response = await fetch(`/api/pos/reports?from=${from}&to=${to}`);
+      const json = await response.json();
 
       if (!response.ok || json.error) {
-        throw new Error(json.error || "Failed to load dashboard")
+        throw new Error(json.error || "Failed to load dashboard");
       }
 
-      setData(json)
+      setData(json);
     } catch (err) {
-      console.error("Failed to load dashboard:", err)
-      setError(err instanceof Error ? err.message : "Failed to load dashboard")
+      console.error("Failed to load dashboard:", err);
+      setError(err instanceof Error ? err.message : "Failed to load dashboard");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
     if (dateFilter !== "custom") {
-      loadDashboard()
+      loadDashboard();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFilter])
+  }, [dateFilter]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setCurrentTime(new Date())
-    }, 60_000)
+      setCurrentTime(new Date());
+    }, 60_000);
 
-    return () => window.clearInterval(timer)
-  }, [])
+    return () => window.clearInterval(timer);
+  }, []);
 
   const handleApplyFilter = () => {
-    loadDashboard()
-  }
+    loadDashboard();
+  };
 
-  const currency = data?.settings?.currency || "PKR"
-  const shopName = data?.settings?.shop_name || "Perfect Traders"
+  const currency = data?.settings?.currency || "PKR";
+  const shopName = data?.settings?.shop_name || "Perfect Traders";
 
-  const sales = data?.summary.sales || 0
-  const profit = data?.summary.profit || 0
-  const receivables = data?.summary.receivables || 0
-  const payables = data?.summary.payables || 0
-  const stockUnits = data?.summary.stock_units || 0
-  const lowStock = data?.low_stock || []
+  const sales = data?.summary.sales || 0;
+  const profit = data?.summary.profit || 0;
+  const receivables = data?.summary.receivables || 0;
+  const payables = data?.summary.payables || 0;
+  const stockUnits = data?.summary.stock_units || 0;
+  const lowStock = data?.low_stock || [];
 
   const recentSales = useMemo(() => {
-    return (data?.sales || []).slice(0, 10)
-  }, [data])
+    return (data?.sales || []).slice(0, 10);
+  }, [data]);
 
   const downloadReceipt = (sale: any) => {
-    const items = sale.pos_sale_items || []
-    
+    const items = sale.pos_sale_items || [];
+
     generatePosReceiptPDF({
       shopName: data?.settings?.shop_name || "Perfect Traders",
       shopAddress: data?.settings?.shop_address,
@@ -169,22 +171,28 @@ export default function DashboardPage() {
         line_total: Number(item.line_total),
       })),
       itemCount: items.length,
-      unitCount: items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0),
+      unitCount: items.reduce(
+        (sum: number, item: any) => sum + Number(item.quantity || 0),
+        0,
+      ),
       grandTotal: Number(sale.total_amount),
       paidAmount: Number(sale.amount_paid),
       remainingAmount: Number(sale.amount_due),
       paymentStatus: sale.payment_status,
-      paymentMode: sale.payment_status ? sale.payment_status.charAt(0).toUpperCase() + sale.payment_status.slice(1) : "",
+      paymentMode: sale.payment_status
+        ? sale.payment_status.charAt(0).toUpperCase() +
+          sale.payment_status.slice(1)
+        : "",
       currency: currency,
-    })
-  }
+    });
+  };
 
   const getDateLabel = () => {
-    if (dateFilter === "today") return "Today"
-    if (dateFilter === "week") return "This Week"
-    if (dateFilter === "month") return "This Month"
-    return `${customFrom} to ${customTo}`
-  }
+    if (dateFilter === "today") return "Today";
+    if (dateFilter === "week") return "This Week";
+    if (dateFilter === "month") return "This Month";
+    return `${customFrom} to ${customTo}`;
+  };
 
   return (
     <main className="h-full w-full flex flex-col overflow-hidden bg-[var(--pos-panel-2)] text-foreground">
@@ -196,14 +204,12 @@ export default function DashboardPage() {
               <p className="text-xs text-muted-foreground uppercase tracking-wider">
                 {shopName}
               </p>
-              <h1 className="text-2xl font-bold mt-1">
-                Dashboard
-              </h1>
+              <h1 className="text-2xl font-bold mt-1">Dashboard</h1>
               <p className="text-sm text-muted-foreground mt-1">
                 Real-time business performance and financial overview.
               </p>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <div className="pos-panel rounded-xl px-3 py-2 flex items-center gap-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1.5">
@@ -233,7 +239,9 @@ export default function DashboardPage() {
                 title="Refresh dashboard"
                 aria-label="Refresh dashboard"
               >
-                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                />
               </button>
             </div>
           </header>
@@ -305,7 +313,10 @@ export default function DashboardPage() {
               <div>
                 <h2 className="font-semibold">Performance Overview</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Showing data for: <span className="font-medium text-foreground">{getDateLabel()}</span>
+                  Showing data for:{" "}
+                  <span className="font-medium text-foreground">
+                    {getDateLabel()}
+                  </span>
                 </p>
               </div>
             </div>
@@ -355,17 +366,6 @@ export default function DashboardPage() {
             />
           </section>
 
-          {/* Quick actions */}
-          <section className="pos-panel rounded-xl p-4">
-            <h2 className="font-semibold">Quick Actions</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-              <QuickAction href="/orders" icon={ShoppingCart} label="New Sale" />
-              <QuickAction href="/inventory" icon={Package} label="Inventory" />
-              <QuickAction href="/receivables" icon={Users} label="Receivables" />
-              <QuickAction href="/payables" icon={Wallet} label="Payables" />
-            </div>
-          </section>
-
           {/* Recent Sales */}
           <section className="pos-panel rounded-xl overflow-hidden">
             <div className="p-4 border-b border-[var(--pos-stroke)] flex items-center justify-between">
@@ -378,7 +378,10 @@ export default function DashboardPage() {
                   Latest 10 sales for the selected period.
                 </p>
               </div>
-              <Link href="/bill-history" className="text-xs text-[var(--pos-brand)] hover:underline font-medium">
+              <Link
+                href="/bill-history"
+                className="text-xs text-[var(--pos-brand)] hover:underline font-medium"
+              >
                 View All Sales →
               </Link>
             </div>
@@ -397,11 +400,20 @@ export default function DashboardPage() {
                 </thead>
                 <tbody>
                   {recentSales.map((sale: any) => (
-                    <tr key={sale.id} className="border-b border-[var(--pos-stroke)] last:border-0">
+                    <tr
+                      key={sale.id}
+                      className="border-b border-[var(--pos-stroke)] last:border-0"
+                    >
                       <td className="p-3 font-medium">{sale.receipt_number}</td>
-                      <td className="p-3 whitespace-nowrap">{sale.sale_date}</td>
-                      <td className="p-3">{sale.pos_customers?.name || "Walk-in Customer"}</td>
-                      <td className="p-3 text-right font-medium">{money(Number(sale.total_amount), currency)}</td>
+                      <td className="p-3 whitespace-nowrap">
+                        {sale.sale_date}
+                      </td>
+                      <td className="p-3">
+                        {sale.pos_customers?.name || "Walk-in Customer"}
+                      </td>
+                      <td className="p-3 text-right font-medium">
+                        {money(Number(sale.total_amount), currency)}
+                      </td>
                       <td className="p-3 capitalize">{sale.payment_status}</td>
                       <td className="p-3 text-right">
                         <button
@@ -416,7 +428,10 @@ export default function DashboardPage() {
                   ))}
                   {recentSales.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                      <td
+                        colSpan={6}
+                        className="p-8 text-center text-muted-foreground"
+                      >
                         No sales found for this period.
                       </td>
                     </tr>
@@ -425,11 +440,10 @@ export default function DashboardPage() {
               </table>
             </div>
           </section>
-
         </div>
       </div>
     </main>
-  )
+  );
 }
 
 function StatCard({
@@ -440,43 +454,73 @@ function StatCard({
   href,
   danger = false,
 }: {
-  icon: any
-  label: string
-  value: string
-  description: string
-  href?: string
-  danger?: boolean
+  icon: any;
+  label: string;
+  value: string;
+  description: string;
+  href?: string;
+  danger?: boolean;
 }) {
   const content = (
-    <div className={`pos-panel rounded-xl p-4 h-full transition ${href ? "hover:bg-foreground/5 cursor-pointer" : ""}`}>
+    <div
+      className={`pos-panel rounded-xl p-4 h-full transition ${href ? "hover:bg-foreground/5 cursor-pointer" : ""}`}
+    >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Icon className={`w-5 h-5 ${danger ? "text-amber-500" : "text-[var(--pos-brand)]"}`} />
-          <span className="text-xs font-semibold text-muted-foreground">{label}</span>
+          <Icon
+            className={`w-5 h-5 ${danger ? "text-amber-500" : "text-[var(--pos-brand)]"}`}
+          />
+          <span className="text-xs font-semibold text-muted-foreground">
+            {label}
+          </span>
         </div>
         {href && <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground" />}
       </div>
       <p className="text-2xl font-bold tracking-tight mt-3">{value}</p>
       <p className="text-xs text-muted-foreground mt-1">{description}</p>
     </div>
-  )
+  );
   if (href) {
-    return <Link href={href}>{content}</Link>
+    return (
+      <Link href={href} prefetch={true}>
+        {content}
+      </Link>
+    );
   }
-  return content
+  return content;
 }
 
-function BalanceCard({ title, value, href }: { title: string; value: string; href: string }) {
+function BalanceCard({
+  title,
+  value,
+  href,
+}: {
+  title: string;
+  value: string;
+  href: string;
+}) {
   return (
-    <Link href={href} className="pos-panel rounded-xl p-4 hover:bg-foreground/5 transition block">
+    <Link
+      href={href}
+      prefetch={true}
+      className="pos-panel rounded-xl p-4 hover:bg-foreground/5 transition block"
+    >
       <p className="text-sm text-muted-foreground">{title}</p>
       <p className="text-2xl font-bold mt-2">{value}</p>
       <p className="text-xs text-[var(--pos-brand)] mt-2">View details →</p>
     </Link>
-  )
+  );
 }
 
-function QuickAction({ href, icon: Icon, label }: { href: string; icon: any; label: string }) {
+function QuickAction({
+  href,
+  icon: Icon,
+  label,
+}: {
+  href: string;
+  icon: any;
+  label: string;
+}) {
   return (
     <Link
       href={href}
@@ -485,5 +529,5 @@ function QuickAction({ href, icon: Icon, label }: { href: string; icon: any; lab
       <Icon className="w-4 h-4 text-[var(--pos-brand)]" />
       {label}
     </Link>
-  )
+  );
 }

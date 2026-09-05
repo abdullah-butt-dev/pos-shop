@@ -25,287 +25,204 @@ export interface PosReceiptData {
   currency?: string
 }
 
-const money = (
-  value: number,
-  _currency = 'PKR',
-) =>
+const money = (value: number, _currency = 'PKR') =>
   `Rs${Number(value || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`
 
-export function generatePosReceiptPDF(
-  receipt: PosReceiptData,
-): void {
-  const width = 80
-  const margin = 5
-  const contentWidth = width - margin * 2
+const WIDTH = 80
+const MARGIN = 5
+const CONTENT_WIDTH = WIDTH - MARGIN * 2
 
-  const estimatedHeight = Math.max(
-    155,
-    110 + receipt.items.length * 9,
-  )
-
-  const doc = new jsPDF({
-    unit: 'mm',
-    format: [width, estimatedHeight],
-  })
-
+/**
+ * Draws the full receipt onto a given jsPDF document and returns the
+ * final Y position reached. Used twice: once on a tall "probe" page to
+ * measure the required height, then again on a page sized to fit.
+ */
+function drawReceipt(doc: jsPDF, receipt: PosReceiptData): number {
   let y = 8
 
+  // --- Shop header ---
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(13)
-
-  doc.text(
-    receipt.shopName || 'Perfect Traders',
-    width / 2,
-    y,
-    { align: 'center' },
-  )
-
+  doc.text(receipt.shopName || 'Perfect Traders', WIDTH / 2, y, {
+    align: 'center',
+  })
   y += 5
 
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(90, 90, 90)
+
   if (receipt.shopAddress) {
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
-    doc.text(receipt.shopAddress, width / 2, y, { align: 'center' })
+    doc.text(receipt.shopAddress, WIDTH / 2, y, { align: 'center' })
     y += 4
   }
 
   if (receipt.shopPhone) {
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
-    doc.text(receipt.shopPhone, width / 2, y, { align: 'center' })
+    doc.text(receipt.shopPhone, WIDTH / 2, y, { align: 'center' })
     y += 4
   }
 
-  y += 2
+  doc.setTextColor(0, 0, 0)
+  y += 3
 
-  doc.setFontSize(9)
+  // --- Receipt # and date, centered and prominent ---
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.text(`Receipt# ${receipt.receiptNumber}`, WIDTH / 2, y, {
+    align: 'center',
+  })
+  y += 5
+
   doc.setFont('helvetica', 'normal')
-
-  doc.text(
-    'SALE RECEIPT',
-    width / 2,
-    y,
-    { align: 'center' },
-  )
-
+  doc.setFontSize(9)
+  doc.setTextColor(90, 90, 90)
+  doc.text(`Date : ${receipt.dateTime}`, WIDTH / 2, y, { align: 'center' })
+  doc.setTextColor(0, 0, 0)
   y += 5
 
-  doc.setFontSize(8)
-
-  doc.text(
-    `Receipt: ${receipt.receiptNumber}`,
-    margin,
-    y,
-  )
-
-  y += 4
-
-  doc.text(
-    `Date: ${receipt.dateTime}`,
-    margin,
-    y,
-  )
-
-  y += 4
-
-  doc.text(
-    `Customer: ${
-      receipt.customerName ||
-      'Walk-in Customer'
-    }`,
-    margin,
-    y,
-  )
-
-  y += 4
-
-  if (receipt.paymentMode) {
-    doc.text(
-      `P Mode: ${receipt.paymentMode}`,
-      margin,
-      y,
-    )
-    y += 4
+  if (receipt.customerName) {
+    doc.setFontSize(8.5)
+    doc.text(`Customer: ${receipt.customerName}`, WIDTH / 2, y, {
+      align: 'center',
+    })
+    y += 6
+  } else {
+    y += 2
   }
 
-  doc.text(
-    `I#: ${receipt.itemCount || 0}  U#: ${receipt.unitCount || 0}  Amount: ${receipt.currency || 'PKR'} ${receipt.grandTotal}`,
-    margin,
-    y,
-  )
+  // --- Info table: P Mode | I# | U# | Amount ---
+  const infoColPMode = MARGIN
+  const infoColI = MARGIN + 30
+  const infoColU = MARGIN + 44
+  const infoColAmount = WIDTH - MARGIN
 
-  y += 5
-
-  doc.line(
-    margin,
-    y,
-    width - margin,
-    y,
-  )
-
-  y += 5
+  doc.setFillColor(236, 236, 236)
+  doc.rect(MARGIN - 1, y - 3.6, CONTENT_WIDTH + 2, 6, 'F')
 
   doc.setFont('helvetica', 'bold')
-
-  doc.text(
-    'ITEM',
-    margin,
-    y,
-  )
-
-  doc.text(
-    'QTY',
-    width - 36,
-    y,
-    { align: 'center' },
-  )
-
-  doc.text(
-    'TOTAL',
-    width - margin,
-    y,
-    { align: 'right' },
-  )
-
-  y += 4
+  doc.setFontSize(8.5)
+  doc.text('P Mode', infoColPMode, y)
+  doc.text('I#', infoColI, y, { align: 'center' })
+  doc.text('U#', infoColU, y, { align: 'center' })
+  doc.text('Amount', infoColAmount, y, { align: 'right' })
+  y += 7
 
   doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.text(receipt.paymentMode || receipt.paymentStatus || '', infoColPMode, y)
+  doc.text(String(receipt.itemCount || 0), infoColI, y, { align: 'center' })
+  doc.text(String(receipt.unitCount || 0), infoColU, y, { align: 'center' })
+  doc.setFont('helvetica', 'bold')
+  doc.text(money(receipt.grandTotal, receipt.currency), infoColAmount, y, {
+    align: 'right',
+  })
+  doc.setFont('helvetica', 'normal')
+  y += 9
+
+  // --- Items table: Name | Price | Qty | Total ---
+  const colName = MARGIN
+  const colPrice = MARGIN + 34
+  const colQty = MARGIN + 46
+  const colTotal = WIDTH - MARGIN
+  const nameWrapWidth = 28
+
+  doc.setFillColor(236, 236, 236)
+  doc.rect(MARGIN - 1, y - 3.6, CONTENT_WIDTH + 2, 6, 'F')
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8.5)
+  doc.text('Name', colName, y)
+  doc.text('Price', colPrice, y, { align: 'right' })
+  doc.text('Qty', colQty, y, { align: 'center' })
+  doc.text('Total', colTotal, y, { align: 'right' })
+  y += 7
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
 
   for (const item of receipt.items) {
-    const nameLines =
-      doc.splitTextToSize(
-        item.name,
-        contentWidth - 27,
-      )
+    const nameLines = doc.splitTextToSize(item.name, nameWrapWidth)
 
-    doc.text(
-      nameLines,
-      margin,
-      y,
-    )
+    doc.text(nameLines, colName, y)
+    doc.text(money(item.unit_price, receipt.currency), colPrice, y, {
+      align: 'right',
+    })
+    doc.text(String(item.quantity), colQty, y, { align: 'center' })
+    doc.text(money(item.line_total, receipt.currency), colTotal, y, {
+      align: 'right',
+    })
 
-    doc.text(
-      String(item.quantity),
-      width - 36,
-      y,
-      { align: 'center' },
-    )
+    const rowHeight = Math.max(6, nameLines.length * 4.5)
+    y += rowHeight
+  }
 
+  // divider
+  y += 1
+  doc.setLineWidth(0.4)
+  doc.line(MARGIN, y, WIDTH - MARGIN, y)
+  y += 6
+
+  // --- Totals ---
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.text('Subtotal', MARGIN, y)
+  doc.text(money(receipt.grandTotal, receipt.currency), WIDTH - MARGIN, y, {
+    align: 'right',
+  })
+  y += 6
+
+  // Only show Paid/Remaining when the sale is actually split (partial payment)
+  if (receipt.remainingAmount > 0 && receipt.paidAmount > 0) {
+    doc.text('Paid', MARGIN, y)
+    doc.text(money(receipt.paidAmount, receipt.currency), WIDTH - MARGIN, y, {
+      align: 'right',
+    })
+    y += 6
+
+    doc.text('Remaining', MARGIN, y)
     doc.text(
-      money(
-        item.line_total,
-        receipt.currency,
-      ),
-      width - margin,
+      money(receipt.remainingAmount, receipt.currency),
+      WIDTH - MARGIN,
       y,
       { align: 'right' },
     )
-
-    y += Math.max(
-      5,
-      nameLines.length * 4,
-    )
-
-    doc.setFontSize(7)
-
-    doc.text(
-      `@ ${money(
-        item.unit_price,
-        receipt.currency,
-      )}`,
-      margin,
-      y,
-    )
-
-    doc.setFontSize(8)
-
-    y += 4
+    y += 6
   }
 
-  doc.line(
-    margin,
-    y,
-    width - margin,
-    y,
-  )
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.text('Grand Total', MARGIN, y)
+  doc.text(money(receipt.grandTotal, receipt.currency), WIDTH - MARGIN, y, {
+    align: 'right',
+  })
+  y += 8
 
-  y += 5
-
-  const rows = [
-    [
-      'Subtotal',
-      money(
-        receipt.grandTotal,
-        receipt.currency,
-      ),
-    ],
-    [
-      'Paid',
-      money(
-        receipt.paidAmount,
-        receipt.currency,
-      ),
-    ],
-    [
-      'Remaining',
-      money(
-        receipt.remainingAmount,
-        receipt.currency,
-      ),
-    ],
-    [
-      'Status',
-      receipt.paymentStatus.toUpperCase(),
-    ],
-    [
-      'Grand Total',
-      money(
-        receipt.grandTotal,
-        receipt.currency,
-      ),
-    ],
-  ]
-
-  for (const [label, value] of rows) {
-    doc.setFont(
-      'helvetica',
-      label === 'Grand Total'
-        ? 'bold'
-        : 'normal',
-    )
-
-    doc.text(
-      label,
-      margin,
-      y,
-    )
-
-    doc.text(
-      value,
-      width - margin,
-      y,
-      { align: 'right' },
-    )
-
-    y += 5
-  }
-
-  y += 4
+  doc.setDrawColor(200, 200, 200)
+  doc.setLineWidth(0.2)
+  doc.line(MARGIN, y, WIDTH - MARGIN, y)
+  y += 6
 
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
+  doc.setFontSize(8.5)
+  doc.setTextColor(90, 90, 90)
+  doc.text('Thank you!', WIDTH / 2, y, { align: 'center' })
+  y += 4
 
-  doc.text(
-    'Thank you!',
-    width / 2,
-    y,
-    { align: 'center' },
-  )
+  return y
+}
 
-  doc.save(
-    `${receipt.receiptNumber || 'receipt'}.pdf`,
-  )
+export function generatePosReceiptPDF(receipt: PosReceiptData): void {
+  // Pass 1: draw on a generously tall probe page just to measure the
+  // real content height (avoids guessing and leaving blank space).
+  const probe = new jsPDF({ unit: 'mm', format: [WIDTH, 400] })
+  const finalY = drawReceipt(probe, receipt)
+
+  // Pass 2: render for real on a page sized to fit exactly.
+  const doc = new jsPDF({ unit: 'mm', format: [WIDTH, finalY] })
+  drawReceipt(doc, receipt)
+
+  doc.save(`${receipt.receiptNumber || 'receipt'}.pdf`)
 }

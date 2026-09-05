@@ -111,7 +111,10 @@ export async function POST(request: Request) {
       .in("product_id", productIds);
 
     if (invLookupError) {
-      console.warn("[API /api/pos/sales] Stock lookup skipped:", invLookupError.message);
+      console.warn(
+        "[API /api/pos/sales] Stock lookup skipped:",
+        invLookupError.message,
+      );
     } else if (inventoryRows) {
       const inventoryMap = new Map<string, number>();
       for (const row of inventoryRows) {
@@ -144,19 +147,25 @@ export async function POST(request: Request) {
       const message = error.message || "Failed to create sale";
       const normalizedMessage = message.toLowerCase();
 
-      const isStockError =
-        normalizedMessage.includes("insufficient stock") ||
+      const isStockError = normalizedMessage.includes("insufficient stock");
+      const isConstraintError =
         normalizedMessage.includes("pos_inventory_quantity_non_negative") ||
         normalizedMessage.includes("check constraint");
 
+      let userFacingError = message;
+      if (isConstraintError) {
+        userFacingError =
+          "Database stock trigger error: Please execute the updated pos_adjust_inventory function from schema.sql in your Supabase SQL Editor.";
+      } else if (isStockError) {
+        userFacingError = "Insufficient stock available to complete this sale.";
+      }
+
       return NextResponse.json(
         {
-          error: isStockError
-            ? "Insufficient stock available to complete this sale."
-            : message,
+          error: userFacingError,
         },
         {
-          status: isStockError ? 409 : 400,
+          status: isStockError || isConstraintError ? 409 : 400,
         },
       );
     }

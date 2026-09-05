@@ -1,17 +1,17 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
-import { CheckCircle2, Clock, Loader2, Receipt, Wallet } from "lucide-react"
-import { toast } from "sonner"
-import { NavHeader } from "@/components/pos/nav-header"
+import type React from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { CheckCircle2, Clock, Loader2, Receipt, Wallet } from "lucide-react";
+import { toast } from "sonner";
+import { NavHeader } from "@/components/pos/nav-header";
 import {
   PosPurchaseService,
   PosSupplierPaymentService,
   type PosPurchaseWithRelations,
   type PosSupplierPaymentWithPurchase,
-} from "@/lib/pos-service"
-import { cn } from "@/lib/utils"
+} from "@/lib/pos-service";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,82 +21,92 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
 
 interface SupplierSummary {
-  id: string
-  name: string
-  totalPurchased: number
-  totalPaid: number
-  outstanding: number
-  purchaseCount: number
+  id: string;
+  name: string;
+  totalPurchased: number;
+  totalPaid: number;
+  outstanding: number;
+  purchaseCount: number;
 }
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  return new Date().toISOString().slice(0, 10);
 }
 
 function formatMoney(value: number) {
-  return `Rs. ${(Number(value) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+  return `Rs. ${(Number(value) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
 function formatDate(value: string) {
-  if (!value) return "—"
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
-  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export default function PayablesPage() {
-  const [purchases, setPurchases] = useState<PosPurchaseWithRelations[]>([])
-  const [purchasesLoading, setPurchasesLoading] = useState(true)
+  const [purchases, setPurchases] = useState<PosPurchaseWithRelations[]>([]);
+  const [purchasesLoading, setPurchasesLoading] = useState(true);
 
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null)
-  const [payments, setPayments] = useState<PosSupplierPaymentWithPurchase[]>([])
-  const [paymentsLoading, setPaymentsLoading] = useState(false)
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(
+    null,
+  );
+  const [payments, setPayments] = useState<PosSupplierPaymentWithPurchase[]>(
+    [],
+  );
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
 
-  const [payingPurchaseId, setPayingPurchaseId] = useState<string | null>(null)
-  const [payAmount, setPayAmount] = useState("")
-  const [payDate, setPayDate] = useState(todayISO)
-  const [payMethod, setPayMethod] = useState("")
-  const [payNotes, setPayNotes] = useState("")
-  const [submitting, setSubmitting] = useState(false)
-  
-  const [purchaseTab, setPurchaseTab] = useState<"outstanding" | "paid">("outstanding")
+  const [payingPurchaseId, setPayingPurchaseId] = useState<string | null>(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [payDate, setPayDate] = useState(todayISO);
+  const [payMethod, setPayMethod] = useState("");
+  const [payNotes, setPayNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const [purchaseTab, setPurchaseTab] = useState<"outstanding" | "paid">(
+    "outstanding",
+  );
 
   const [pendingPayment, setPendingPayment] = useState<{
-    purchase: PosPurchaseWithRelations
-    amount: number
-    date: string
-    method: string
-    notes: string
-  } | null>(null)
+    purchase: PosPurchaseWithRelations;
+    amount: number;
+    date: string;
+    method: string;
+    notes: string;
+  } | null>(null);
 
   const loadPurchases = useCallback(async () => {
-    setPurchasesLoading(true)
-    const data = await PosPurchaseService.list()
-    setPurchases(data)
-    setPurchasesLoading(false)
-  }, [])
+    setPurchasesLoading(true);
+    const data = await PosPurchaseService.list();
+    setPurchases(data);
+    setPurchasesLoading(false);
+  }, []);
 
   const loadPayments = useCallback(async (supplierId: string) => {
-    setPaymentsLoading(true)
-    const data = await PosSupplierPaymentService.listForSupplier(supplierId)
-    setPayments(data)
-    setPaymentsLoading(false)
-  }, [])
+    setPaymentsLoading(true);
+    const data = await PosSupplierPaymentService.listForSupplier(supplierId);
+    setPayments(data);
+    setPaymentsLoading(false);
+  }, []);
 
   useEffect(() => {
-    loadPurchases()
-  }, [loadPurchases])
+    loadPurchases();
+  }, [loadPurchases]);
 
   useEffect(() => {
-    if (selectedSupplierId) loadPayments(selectedSupplierId)
-    else setPayments([])
-  }, [selectedSupplierId, loadPayments])
+    if (selectedSupplierId) loadPayments(selectedSupplierId);
+    else setPayments([]);
+  }, [selectedSupplierId, loadPayments]);
 
   const supplierSummaries = useMemo<SupplierSummary[]>(() => {
-    const map = new Map<string, SupplierSummary>()
+    const map = new Map<string, SupplierSummary>();
     for (const p of purchases) {
       const existing = map.get(p.supplier_id) || {
         id: p.supplier_id,
@@ -105,67 +115,73 @@ export default function PayablesPage() {
         totalPaid: 0,
         outstanding: 0,
         purchaseCount: 0,
-      }
-      existing.totalPurchased += Number(p.total_amount) || 0
-      existing.totalPaid += Number(p.amount_paid) || 0
-      existing.outstanding += Number(p.amount_due) || 0
-      existing.purchaseCount += 1
-      map.set(p.supplier_id, existing)
+      };
+      existing.totalPurchased += Number(p.total_amount) || 0;
+      existing.totalPaid += Number(p.amount_paid) || 0;
+      existing.outstanding += Number(p.amount_due) || 0;
+      existing.purchaseCount += 1;
+      map.set(p.supplier_id, existing);
     }
-    return Array.from(map.values()).sort((a, b) => b.outstanding - a.outstanding)
-  }, [purchases])
+    return Array.from(map.values()).sort(
+      (a, b) => b.outstanding - a.outstanding,
+    );
+  }, [purchases]);
 
   const totalOutstanding = useMemo(
     () => supplierSummaries.reduce((sum, s) => sum + s.outstanding, 0),
     [supplierSummaries],
-  )
-  
-  const suppliersWithOutstanding = useMemo(
-    () => supplierSummaries.filter(s => s.outstanding > 0.009).length,
-    [supplierSummaries]
-  )
+  );
 
-  const selectedSupplier = supplierSummaries.find((s) => s.id === selectedSupplierId) || null
+  const suppliersWithOutstanding = useMemo(
+    () => supplierSummaries.filter((s) => s.outstanding > 0.009).length,
+    [supplierSummaries],
+  );
+
+  const selectedSupplier =
+    supplierSummaries.find((s) => s.id === selectedSupplierId) || null;
 
   const supplierPurchases = useMemo(
     () =>
       purchases
         .filter((p) => p.supplier_id === selectedSupplierId)
         .filter((p) => {
-          const due = Number(p.amount_due) || 0
-          if (purchaseTab === "outstanding") return due > 0.009
-          return due <= 0.009
+          const due = Number(p.amount_due) || 0;
+          if (purchaseTab === "outstanding") return due > 0.009;
+          return due <= 0.009;
         })
         .sort((a, b) => (a.purchase_date < b.purchase_date ? 1 : -1)),
     [purchases, selectedSupplierId, purchaseTab],
-  )
+  );
 
   function selectSupplier(id: string) {
-    setSelectedSupplierId(id)
-    setPayingPurchaseId(null)
-    setPurchaseTab("outstanding")
+    setSelectedSupplierId(id);
+    setPayingPurchaseId(null);
+    setPurchaseTab("outstanding");
   }
 
   function openPaymentForm(purchase: PosPurchaseWithRelations) {
-    setPayingPurchaseId(purchase.id)
-    setPayAmount(String(Number(purchase.amount_due) || ""))
-    setPayDate(todayISO())
-    setPayMethod("")
-    setPayNotes("")
+    setPayingPurchaseId(purchase.id);
+    setPayAmount(String(Number(purchase.amount_due) || ""));
+    setPayDate(todayISO());
+    setPayMethod("");
+    setPayNotes("");
   }
 
   function closePaymentForm() {
-    setPayingPurchaseId(null)
+    setPayingPurchaseId(null);
   }
 
-  function handleRecordPayment(e: React.FormEvent<HTMLFormElement>, purchase: PosPurchaseWithRelations) {
-    e.preventDefault()
-    if (!selectedSupplierId) return
+  function handleRecordPayment(
+    e: React.FormEvent<HTMLFormElement>,
+    purchase: PosPurchaseWithRelations,
+  ) {
+    e.preventDefault();
+    if (!selectedSupplierId) return;
 
-    const amount = Number(payAmount)
+    const amount = Number(payAmount);
     if (!(amount > 0)) {
-      toast.error("Enter a payment amount greater than 0")
-      return
+      toast.error("Enter a payment amount greater than 0");
+      return;
     }
 
     setPendingPayment({
@@ -174,13 +190,13 @@ export default function PayablesPage() {
       date: payDate,
       method: payMethod,
       notes: payNotes,
-    })
+    });
   }
-  
+
   async function confirmPayment() {
-    if (!pendingPayment || !selectedSupplierId) return
-    
-    setSubmitting(true)
+    if (!pendingPayment || !selectedSupplierId) return;
+
+    setSubmitting(true);
     try {
       await PosSupplierPaymentService.create({
         supplier_id: selectedSupplierId,
@@ -189,17 +205,19 @@ export default function PayablesPage() {
         payment_date: pendingPayment.date,
         payment_method: pendingPayment.method.trim() || undefined,
         notes: pendingPayment.notes.trim() || undefined,
-      })
+      });
 
-      toast.success("Payment recorded")
-      closePaymentForm()
-      await loadPurchases()
-      await loadPayments(selectedSupplierId)
+      toast.success("Payment recorded");
+      closePaymentForm();
+      await loadPurchases();
+      await loadPayments(selectedSupplierId);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to record payment")
+      toast.error(
+        error instanceof Error ? error.message : "Failed to record payment",
+      );
     } finally {
-      setSubmitting(false)
-      setPendingPayment(null)
+      setSubmitting(false);
+      setPendingPayment(null);
     }
   }
 
@@ -212,11 +230,12 @@ export default function PayablesPage() {
             <div>
               <h1 className="text-2xl font-bold">Supplier Payables</h1>
               <p className="text-sm text-muted-foreground">
-                Track what&apos;s owed to each supplier and record payments against purchases
+                Track what&apos;s owed to each supplier and record payments
+                against purchases
               </p>
             </div>
           </div>
-          
+
           <div className="pos-panel rounded-xl p-6 flex flex-col items-center justify-center text-center gap-2 border border-[var(--pos-stroke)] bg-gradient-to-br from-background to-background/50">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Total Payable
@@ -225,7 +244,9 @@ export default function PayablesPage() {
               {formatMoney(totalOutstanding)}
             </p>
             <p className="text-sm text-muted-foreground mt-2 font-medium">
-              Across {suppliersWithOutstanding} supplier{suppliersWithOutstanding === 1 ? "" : "s"} with outstanding balances
+              Across {suppliersWithOutstanding} supplier
+              {suppliersWithOutstanding === 1 ? "" : "s"} with outstanding
+              balances
             </p>
           </div>
 
@@ -238,7 +259,9 @@ export default function PayablesPage() {
               {purchasesLoading ? (
                 <p className="text-sm text-muted-foreground">Loading...</p>
               ) : supplierSummaries.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No purchases recorded yet.</p>
+                <p className="text-sm text-muted-foreground">
+                  No purchases recorded yet.
+                </p>
               ) : (
                 <ul className="flex flex-col gap-1.5 overflow-y-auto pr-2 pb-2">
                   {supplierSummaries.map((s) => (
@@ -254,14 +277,19 @@ export default function PayablesPage() {
                         )}
                       >
                         <span className="min-w-0">
-                          <span className="block text-sm font-semibold truncate">{s.name}</span>
+                          <span className="block text-sm font-semibold truncate">
+                            {s.name}
+                          </span>
                           <span
                             className={cn(
                               "block text-[11px]",
-                              s.id === selectedSupplierId ? "text-black/70" : "text-muted-foreground",
+                              s.id === selectedSupplierId
+                                ? "text-black/70"
+                                : "text-muted-foreground",
                             )}
                           >
-                            {s.purchaseCount} purchase{s.purchaseCount === 1 ? "" : "s"}
+                            {s.purchaseCount} purchase
+                            {s.purchaseCount === 1 ? "" : "s"}
                           </span>
                         </span>
                         <span
@@ -276,7 +304,9 @@ export default function PayablesPage() {
                                 : "text-emerald-500",
                           )}
                         >
-                          {s.outstanding > 0.009 ? formatMoney(s.outstanding) : "Settled"}
+                          {s.outstanding > 0.009
+                            ? formatMoney(s.outstanding)
+                            : "Settled"}
                         </span>
                       </button>
                     </li>
@@ -298,7 +328,9 @@ export default function PayablesPage() {
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                         Total Purchased
                       </p>
-                      <p className="text-lg font-bold">{formatMoney(selectedSupplier.totalPurchased)}</p>
+                      <p className="text-lg font-bold">
+                        {formatMoney(selectedSupplier.totalPurchased)}
+                      </p>
                     </div>
                     <div>
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
@@ -315,7 +347,9 @@ export default function PayablesPage() {
                       <p
                         className={cn(
                           "text-lg font-bold",
-                          selectedSupplier.outstanding > 0.009 ? "text-amber-500" : "text-emerald-500",
+                          selectedSupplier.outstanding > 0.009
+                            ? "text-amber-500"
+                            : "text-emerald-500",
                         )}
                       >
                         {formatMoney(selectedSupplier.outstanding)}
@@ -330,7 +364,9 @@ export default function PayablesPage() {
                         <button
                           className={cn(
                             "flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold rounded-md transition",
-                            purchaseTab === "outstanding" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                            purchaseTab === "outstanding"
+                              ? "bg-background shadow-sm text-foreground"
+                              : "text-muted-foreground hover:text-foreground",
                           )}
                           onClick={() => setPurchaseTab("outstanding")}
                         >
@@ -339,7 +375,9 @@ export default function PayablesPage() {
                         <button
                           className={cn(
                             "flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold rounded-md transition",
-                            purchaseTab === "paid" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                            purchaseTab === "paid"
+                              ? "bg-background shadow-sm text-foreground"
+                              : "text-muted-foreground hover:text-foreground",
                           )}
                           onClick={() => setPurchaseTab("paid")}
                         >
@@ -347,13 +385,13 @@ export default function PayablesPage() {
                         </button>
                       </div>
                     </div>
-                    
+
                     <div className="overflow-x-auto w-full">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider border-b border-[var(--pos-stroke)]">
                             <th className="py-2 pr-3">Date</th>
-                            <th className="py-2 pr-3">Reference</th>
+
                             <th className="py-2 pr-3 text-right">Amount</th>
                             <th className="py-2 pr-3 text-right">Paid</th>
                             <th className="py-2 pr-3 text-right">Remaining</th>
@@ -364,19 +402,24 @@ export default function PayablesPage() {
                         <tbody>
                           {supplierPurchases.length === 0 ? (
                             <tr>
-                              <td colSpan={7} className="py-4 text-center text-muted-foreground text-sm">
+                              <td
+                                colSpan={6}
+                                className="py-4 text-center text-muted-foreground text-sm"
+                              >
                                 No {purchaseTab} purchases found.
                               </td>
                             </tr>
                           ) : (
                             supplierPurchases.map((p) => {
-                              const due = Number(p.amount_due) || 0
-                              const isPaying = payingPurchaseId === p.id
+                              const due = Number(p.amount_due) || 0;
+                              const isPaying = payingPurchaseId === p.id;
                               return (
                                 <Fragment key={p.id}>
                                   <tr className="border-b border-[var(--pos-stroke)]/50 align-top">
-                                    <td className="py-3 pr-3 whitespace-nowrap">{formatDate(p.purchase_date)}</td>
-                                    <td className="py-3 pr-3 whitespace-nowrap">{p.reference_number || "—"}</td>
+                                    <td className="py-3 pr-3 whitespace-nowrap">
+                                      {formatDate(p.purchase_date)}
+                                    </td>
+
                                     <td className="py-3 pr-3 text-right whitespace-nowrap">
                                       {formatMoney(Number(p.total_amount) || 0)}
                                     </td>
@@ -390,9 +433,12 @@ export default function PayablesPage() {
                                       <span
                                         className={cn(
                                           "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase",
-                                          p.payment_status === "paid" && "bg-emerald-500/10 text-emerald-500",
-                                          p.payment_status === "partial" && "bg-amber-500/10 text-amber-500",
-                                          p.payment_status === "unpaid" && "bg-red-500/10 text-red-500",
+                                          p.payment_status === "paid" &&
+                                            "bg-emerald-500/10 text-emerald-500",
+                                          p.payment_status === "partial" &&
+                                            "bg-amber-500/10 text-amber-500",
+                                          p.payment_status === "unpaid" &&
+                                            "bg-red-500/10 text-red-500",
                                         )}
                                       >
                                         {p.payment_status}
@@ -402,23 +448,32 @@ export default function PayablesPage() {
                                       {due > 0.009 ? (
                                         <button
                                           type="button"
-                                          onClick={() => (isPaying ? closePaymentForm() : openPaymentForm(p))}
+                                          onClick={() =>
+                                            isPaying
+                                              ? closePaymentForm()
+                                              : openPaymentForm(p)
+                                          }
                                           className="px-3 py-1.5 rounded-lg bg-pos-brand text-black text-xs font-bold transition active:scale-[0.98]"
                                         >
-                                          {isPaying ? "Cancel" : "Record Payment"}
+                                          {isPaying
+                                            ? "Cancel"
+                                            : "Record Payment"}
                                         </button>
                                       ) : (
                                         <span className="inline-flex items-center gap-1 text-xs text-emerald-500 font-semibold justify-end w-full">
-                                          <CheckCircle2 className="w-3.5 h-3.5" /> Paid
+                                          <CheckCircle2 className="w-3.5 h-3.5" />{" "}
+                                          Paid
                                         </span>
                                       )}
                                     </td>
                                   </tr>
                                   {isPaying && (
                                     <tr className="border-b border-[var(--pos-stroke)]/50">
-                                      <td colSpan={7} className="py-3">
+                                      <td colSpan={6} className="py-3">
                                         <form
-                                          onSubmit={(e) => handleRecordPayment(e, p)}
+                                          onSubmit={(e) =>
+                                            handleRecordPayment(e, p)
+                                          }
                                           className="bg-foreground/5 rounded-xl p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end"
                                         >
                                           <div>
@@ -435,7 +490,9 @@ export default function PayablesPage() {
                                               step="0.01"
                                               max={due}
                                               value={payAmount}
-                                              onChange={(e) => setPayAmount(e.target.value)}
+                                              onChange={(e) =>
+                                                setPayAmount(e.target.value)
+                                              }
                                               className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
                                             />
                                             <p className="text-[10px] text-muted-foreground mt-1">
@@ -453,7 +510,9 @@ export default function PayablesPage() {
                                               id={`date-${p.id}`}
                                               type="date"
                                               value={payDate}
-                                              onChange={(e) => setPayDate(e.target.value)}
+                                              onChange={(e) =>
+                                                setPayDate(e.target.value)
+                                              }
                                               className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
                                             />
                                           </div>
@@ -468,7 +527,9 @@ export default function PayablesPage() {
                                               id={`method-${p.id}`}
                                               type="text"
                                               value={payMethod}
-                                              onChange={(e) => setPayMethod(e.target.value)}
+                                              onChange={(e) =>
+                                                setPayMethod(e.target.value)
+                                              }
                                               placeholder="e.g. Cash"
                                               className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
                                             />
@@ -479,7 +540,9 @@ export default function PayablesPage() {
                                               disabled={submitting}
                                               className="flex-1 px-3 py-2 rounded-xl bg-pos-brand text-black text-xs font-bold transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                                             >
-                                              {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                                              {submitting && (
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                              )}
                                               Save
                                             </button>
                                             <button
@@ -501,7 +564,9 @@ export default function PayablesPage() {
                                               id={`notes-${p.id}`}
                                               type="text"
                                               value={payNotes}
-                                              onChange={(e) => setPayNotes(e.target.value)}
+                                              onChange={(e) =>
+                                                setPayNotes(e.target.value)
+                                              }
                                               placeholder="Reference, cheque #, etc."
                                               className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
                                             />
@@ -511,7 +576,7 @@ export default function PayablesPage() {
                                     </tr>
                                   )}
                                 </Fragment>
-                              )
+                              );
                             })
                           )}
                         </tbody>
@@ -524,9 +589,13 @@ export default function PayablesPage() {
                       <Clock className="w-4 h-4" /> Payment History
                     </h2>
                     {paymentsLoading ? (
-                      <p className="text-sm text-muted-foreground">Loading...</p>
+                      <p className="text-sm text-muted-foreground">
+                        Loading...
+                      </p>
                     ) : payments.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No payments recorded yet.</p>
+                      <p className="text-sm text-muted-foreground">
+                        No payments recorded yet.
+                      </p>
                     ) : (
                       <div className="overflow-x-auto w-full">
                         <table className="w-full text-sm">
@@ -541,18 +610,29 @@ export default function PayablesPage() {
                           </thead>
                           <tbody>
                             {payments.map((pay) => (
-                              <tr key={pay.id} className="border-b border-[var(--pos-stroke)]/50">
-                                <td className="py-3 pr-3 whitespace-nowrap">{formatDate(pay.payment_date)}</td>
+                              <tr
+                                key={pay.id}
+                                className="border-b border-[var(--pos-stroke)]/50"
+                              >
+                                <td className="py-3 pr-3 whitespace-nowrap">
+                                  {formatDate(pay.payment_date)}
+                                </td>
                                 <td className="py-3 pr-3 whitespace-nowrap text-muted-foreground">
                                   {pay.pos_purchases
-                                    ? `${pay.pos_purchases.reference_number || formatDate(pay.pos_purchases.purchase_date)}`
+                                    ? formatDate(
+                                        pay.pos_purchases.purchase_date,
+                                      )
                                     : "—"}
                                 </td>
                                 <td className="py-3 pr-3 text-right whitespace-nowrap font-semibold">
                                   {formatMoney(Number(pay.amount) || 0)}
                                 </td>
-                                <td className="py-3 pr-3 whitespace-nowrap">{pay.payment_method || "—"}</td>
-                                <td className="py-3 text-muted-foreground">{pay.notes || "—"}</td>
+                                <td className="py-3 pr-3 whitespace-nowrap">
+                                  {pay.payment_method || "—"}
+                                </td>
+                                <td className="py-3 text-muted-foreground">
+                                  {pay.notes || "—"}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -566,21 +646,28 @@ export default function PayablesPage() {
           </div>
         </div>
       </div>
-      
-      <AlertDialog open={!!pendingPayment} onOpenChange={(open) => !open && setPendingPayment(null)}>
+
+      <AlertDialog
+        open={!!pendingPayment}
+        onOpenChange={(open) => !open && setPendingPayment(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Payment</AlertDialogTitle>
             <AlertDialogDescription>
-              Record payment of Rs {pendingPayment?.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} to {selectedSupplier?.name}?
+              Record payment of Rs{" "}
+              {pendingPayment?.amount.toLocaleString(undefined, {
+                maximumFractionDigits: 2,
+              })}{" "}
+              to {selectedSupplier?.name}?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={(e) => {
-                e.preventDefault()
-                confirmPayment()
+                e.preventDefault();
+                confirmPayment();
               }}
               disabled={submitting}
               className="bg-pos-brand text-black hover:bg-pos-brand/90"
@@ -591,5 +678,5 @@ export default function PayablesPage() {
         </AlertDialogContent>
       </AlertDialog>
     </main>
-  )
+  );
 }
