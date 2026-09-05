@@ -73,25 +73,47 @@ export default function InventoryPage() {
   } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [productsData, suppliersData, inventoryData] = await Promise.all([
-      PosProductService.listAll(),
-      PosSupplierService.listAll(),
-      PosInventoryService.list(),
-    ]);
-    const invMap = new Map<string, number>();
-    for (const item of inventoryData) {
-      invMap.set(item.product_id, Number(item.quantity) || 0);
+  const load = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    try {
+      const [productsData, suppliersData, inventoryData] = await Promise.all([
+        PosProductService.listAll(),
+        PosSupplierService.listAll(),
+        PosInventoryService.list(),
+      ]);
+      const invMap = new Map<string, number>();
+      for (const item of inventoryData) {
+        invMap.set(item.product_id, Number(item.quantity) || 0);
+      }
+      setInventoryMap(invMap);
+      setProducts(productsData);
+      setSuppliers(suppliersData);
+    } catch (e) {
+      console.error("Failed to load catalog data:", e);
+    } finally {
+      setLoading(false);
     }
-    setInventoryMap(invMap);
-    setProducts(productsData);
-    setSuppliers(suppliersData);
-    setLoading(false);
   }, []);
 
   useEffect(() => {
     load();
+
+    const onFocus = () => {
+      load(true);
+    };
+    window.addEventListener("focus", onFocus);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        load(true);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [load]);
 
   const productRows = useMemo(() => {
@@ -120,7 +142,7 @@ export default function InventoryPage() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const name = String(formData.get("name") || "").trim();
-    const unit = String(formData.get("unit") || "").trim() || "unit";
+    const unit = editingProduct?.unit || "pcs";
 
     if (!name) {
       toast.error("Product name is required");
@@ -311,8 +333,7 @@ export default function InventoryPage() {
                                   : "text-foreground",
                               )}
                             >
-                              {inventoryMap.get(product.id) ?? 0}{" "}
-                              {product.unit || "unit"}s
+                              {inventoryMap.get(product.id) ?? 0}
                             </span>
                           </p>
                         </div>
@@ -523,22 +544,6 @@ export default function InventoryPage() {
                 name="name"
                 placeholder="e.g. Cold Brew Coffee"
                 defaultValue={editingProduct?.name}
-                required
-                className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
-              />
-            </div>
-            <div className="space-y-2">
-              <label
-                htmlFor="prod-unit"
-                className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block"
-              >
-                Unit
-              </label>
-              <input
-                id="prod-unit"
-                name="unit"
-                placeholder="e.g. bottle, crate, kg"
-                defaultValue={editingProduct?.unit || "unit"}
                 required
                 className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
               />

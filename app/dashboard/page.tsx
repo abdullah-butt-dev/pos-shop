@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowDownLeft,
   ArrowUpRight,
   CalendarDays,
   ChevronDown,
@@ -19,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { NavHeader } from "@/components/pos/nav-header";
+import { InfoTooltip } from "@/components/pos/info-tooltip";
 import {
   generatePosReceiptPDF,
   formatPakistanDateTime,
@@ -326,32 +326,20 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <StatCard
                 icon={ShoppingCart}
                 label="Sales"
                 value={money(sales, currency)}
                 description="Recognized on sale date"
+                tooltip="Total value of goods sold in this period."
               />
               <StatCard
                 icon={TrendingUp}
                 label="Profit"
                 value={money(profit, currency)}
                 description="Revenue minus FIFO cost"
-              />
-              <StatCard
-                icon={ArrowDownLeft}
-                label="Cash In (Customer)"
-                value={money(customerPayments, currency)}
-                description="Cash collected in period"
-                href="/receivables"
-              />
-              <StatCard
-                icon={ArrowUpRight}
-                label="Cash Out (Supplier)"
-                value={money(supplierPayments, currency)}
-                description="Cash paid in period"
-                href="/payables"
+                tooltip="Total sales revenue minus the wholesale purchase cost (FIFO) of the items sold."
               />
             </div>
           </section>
@@ -362,16 +350,19 @@ export default function DashboardPage() {
               title="Total Customer Receivables"
               value={money(receivables, currency)}
               href="/receivables"
+              tooltip="Total money that customers currently owe to your store for goods bought on credit."
             />
             <BalanceCard
               title="Total Supplier Payables"
               value={money(payables, currency)}
               href="/payables"
+              tooltip="Total money that your store currently owes to suppliers for stock bought on credit."
             />
             <BalanceCard
               title="Total Products in Catalog"
               value={totalProducts.toLocaleString("en-PK")}
               href="/inventory"
+              tooltip="Total number of active product items registered in your store catalog."
             />
           </section>
 
@@ -469,6 +460,7 @@ function StatCard({
   description,
   href,
   danger = false,
+  tooltip,
 }: {
   icon: any;
   label: string;
@@ -476,19 +468,21 @@ function StatCard({
   description: string;
   href?: string;
   danger?: boolean;
+  tooltip?: string;
 }) {
   const content = (
     <div
       className={`pos-panel rounded-xl p-4 h-full transition ${href ? "hover:bg-foreground/5 cursor-pointer" : ""}`}
     >
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <Icon
             className={`w-5 h-5 ${danger ? "text-amber-500" : "text-[var(--pos-brand)]"}`}
           />
           <span className="text-xs font-semibold text-muted-foreground">
             {label}
           </span>
+          {tooltip && <InfoTooltip text={tooltip} title={label} side="top" />}
         </div>
         {href && <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground" />}
       </div>
@@ -510,21 +504,30 @@ function BalanceCard({
   title,
   value,
   href,
+  tooltip,
 }: {
   title: string;
   value: string;
   href: string;
+  tooltip?: string;
 }) {
   return (
-    <Link
-      href={href}
-      prefetch={true}
-      className="pos-panel rounded-xl p-4 hover:bg-foreground/5 transition block"
-    >
-      <p className="text-sm text-muted-foreground">{title}</p>
+    <div className="pos-panel rounded-xl p-4 hover:bg-foreground/5 transition block">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm text-muted-foreground">{title}</p>
+          {tooltip && <InfoTooltip text={tooltip} title={title} side="top" />}
+        </div>
+      </div>
       <p className="text-2xl font-bold mt-2">{value}</p>
-      <p className="text-xs text-[var(--pos-brand)] mt-2">View details →</p>
-    </Link>
+      <Link
+        href={href}
+        prefetch={true}
+        className="text-xs text-[var(--pos-brand)] mt-2 inline-block hover:underline"
+      >
+        View details →
+      </Link>
+    </div>
   );
 }
 

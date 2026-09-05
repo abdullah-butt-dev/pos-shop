@@ -203,11 +203,12 @@ export default function OrdersPage() {
       if (!isSilent) setLoading(true);
       setRefreshing(true);
 
+      const ts = Date.now();
       const [productsResponse, inventoryResponse, purchasesResponse] =
         await Promise.all([
-          fetch("/api/pos/products", { cache: "no-store" }),
-          fetch("/api/pos/inventory", { cache: "no-store" }),
-          fetch("/api/pos/purchases", { cache: "no-store" }),
+          fetch(`/api/pos/products?t=${ts}`, { cache: "no-store" }),
+          fetch(`/api/pos/inventory?t=${ts}`, { cache: "no-store" }),
+          fetch(`/api/pos/purchases?t=${ts}`, { cache: "no-store" }),
         ]);
 
       const productsJson = await productsResponse.json();

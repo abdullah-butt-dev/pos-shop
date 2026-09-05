@@ -13,6 +13,7 @@ import {
   AutocompleteField,
   type AutocompleteOption,
 } from "@/components/purchases/autocomplete-field";
+import { InfoTooltip } from "@/components/pos/info-tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -357,7 +358,7 @@ export function OrderSummary({
 
                   <div className="flex items-center justify-between mt-3 pt-2 border-t border-[var(--pos-stroke)]">
                     <span className="text-xs text-muted-foreground">
-                      Line total
+                      Item Total
                     </span>
 
                     <span className="font-semibold text-sm">
@@ -380,9 +381,16 @@ export function OrderSummary({
               </div>
 
               <div>
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Payment Mode
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Payment Mode
+                  </label>
+                  <InfoTooltip
+                    title="Payment Options"
+                    text="Paid: Full payment received in cash right now. Partial: Part of the bill is paid now; the rest is recorded in Customer Receivables. Credit: No upfront payment; the full bill is recorded in Customer Receivables."
+                    side="left"
+                  />
+                </div>
 
                 <div className="grid grid-cols-3 gap-2 mt-2">
                   <button

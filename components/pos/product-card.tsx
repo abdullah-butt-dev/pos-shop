@@ -198,43 +198,71 @@ export function ProductCard({
           className="mt-1 pt-2.5 border-t border-[var(--pos-stroke)] text-xs space-y-2 cursor-default"
         >
           <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-            <span>Purchase History</span>
-            <span>Total Stock: {stock}</span>
+            <span>Purchase Breakdown</span>
+            <span className="font-bold text-foreground">
+              Current Stock: {stock}
+            </span>
           </div>
 
           {purchaseHistory && purchaseHistory.length > 0 ? (
-            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-              {purchaseHistory.map((entry, idx) => (
-                <div
-                  key={idx}
-                  className="p-2 rounded-lg bg-[var(--pos-panel-2)] border border-[var(--pos-stroke)] flex flex-col gap-1"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <Link
-                      href="/payables"
-                      className="font-medium text-amber-600 dark:text-amber-400 hover:underline truncate"
-                      title={`View payables for ${entry.supplierName}`}
-                    >
-                      {entry.supplierName}
-                    </Link>
-                    <span className="font-semibold text-foreground shrink-0">
-                      Rs. {entry.unitCost.toLocaleString()}
-                    </span>
+            <>
+              {(() => {
+                const totalPurchased = purchaseHistory.reduce(
+                  (sum, e) => sum + (Number(e.totalQuantity) || 0),
+                  0,
+                );
+                return (
+                  totalPurchased > stock && (
+                    <div className="text-[11px] px-2 py-1 rounded bg-muted/40 text-muted-foreground flex items-center justify-between">
+                      <span>
+                        Total Purchased:{" "}
+                        <strong className="text-foreground">
+                          {totalPurchased}
+                        </strong>
+                      </span>
+                      <span>
+                        Sold:{" "}
+                        <strong className="text-foreground">
+                          {totalPurchased - stock}
+                        </strong>
+                      </span>
+                    </div>
+                  )
+                );
+              })()}
+              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                {purchaseHistory.map((entry, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2 rounded-lg bg-[var(--pos-panel-2)] border border-[var(--pos-stroke)] flex flex-col gap-1"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <Link
+                        href="/payables"
+                        className="font-medium text-amber-600 dark:text-amber-400 hover:underline truncate"
+                        title={`View payables for ${entry.supplierName}`}
+                      >
+                        {entry.supplierName}
+                      </Link>
+                      <span className="font-semibold text-foreground shrink-0">
+                        Rs. {entry.unitCost.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>
+                        Purchased:{" "}
+                        <strong className="text-foreground">
+                          {entry.totalQuantity}
+                        </strong>
+                      </span>
+                      <span className="text-[10px] text-muted-foreground/80">
+                        {entry.dateBreakdown}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>
-                      Qty:{" "}
-                      <strong className="text-foreground">
-                        {entry.totalQuantity}
-                      </strong>
-                    </span>
-                    <span className="text-[10px] text-muted-foreground/80">
-                      {entry.dateBreakdown}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </>
           ) : (
             <p className="text-xs text-muted-foreground/75 py-1">
               No purchase records found for this product.

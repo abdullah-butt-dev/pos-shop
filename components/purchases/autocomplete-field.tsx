@@ -50,13 +50,20 @@ export function AutocompleteField({
   const trimmed = text.trim();
   const isCurrentSelection = !!value && value.name === trimmed;
 
-  // Fetch options: search when debounced text changes, or load all when opened with empty text
+  // Fetch options: search when debounced text changes and dropdown is open
   useEffect(() => {
     let cancelled = false;
     const term = debouncedText.trim();
 
-    // If user has a selected value and hasn't changed the text, don't re-search unless open
-    if (value && value.name === term && !open) {
+    // If dropdown is not open, do not search or set loading
+    if (!open) {
+      setLoading(false);
+      return;
+    }
+
+    // If user has a selected value and hasn't edited the text, do not search
+    if (value && value.name.toLowerCase() === term.toLowerCase()) {
+      setLoading(false);
       return;
     }
 
@@ -72,7 +79,7 @@ export function AutocompleteField({
     return () => {
       cancelled = true;
     };
-  }, [debouncedText, open]);
+  }, [debouncedText, open, value]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -103,6 +110,7 @@ export function AutocompleteField({
   const showDropdown = open && (!isCurrentSelection || rows.length > 0);
 
   function selectOption(option: AutocompleteOption) {
+    setLoading(false);
     onChange(option);
     setText(option.name);
     setOpen(false);
@@ -160,12 +168,10 @@ export function AutocompleteField({
           autoComplete="off"
           onFocus={() => {
             setOpen(true);
-            if (options.length === 0) {
-              setLoading(true);
-              searchFn(trimmed)
-                .then(setOptions)
-                .finally(() => setLoading(false));
-            }
+            setLoading(true);
+            searchFn(trimmed)
+              .then(setOptions)
+              .finally(() => setLoading(false));
           }}
           onChange={(e) => {
             setText(e.target.value);
@@ -197,10 +203,12 @@ export function AutocompleteField({
           )}
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
-          {loading || creating ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+          {creating ? (
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
           ) : value ? (
-            <Check className="w-4 h-4 text-[var(--pos-brand)]" />
+            <Check className="w-4 h-4 text-emerald-500 transition-colors" />
+          ) : loading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
           ) : (
             <ChevronDown className="w-4 h-4" />
           )}

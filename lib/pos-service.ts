@@ -95,7 +95,7 @@ export class PosProductService {
   // Full product catalog (active + inactive), used by the Inventory page.
   static async listAll(): Promise<PosProductRow[]> {
     try {
-      const res = await fetch("/api/pos/products?all=1", {
+      const res = await fetch(`/api/pos/products?all=1&t=${Date.now()}`, {
         cache: "no-store",
       });
       const json = await res.json();
@@ -355,7 +355,7 @@ export interface PosInventoryRow extends PosInventory {
 export class PosInventoryService {
   static async list(): Promise<PosInventoryRow[]> {
     try {
-      const res = await fetch("/api/pos/inventory", {
+      const res = await fetch(`/api/pos/inventory?t=${Date.now()}`, {
         cache: "no-store",
       });
       const json = await res.json();

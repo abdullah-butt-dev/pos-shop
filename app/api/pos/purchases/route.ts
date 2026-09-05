@@ -102,8 +102,10 @@ export async function POST(request: Request) {
         })),
         p_amount_paid: Number(amount_paid) || 0,
         p_payment_method: payment_method || null,
-        p_reference_number: null,
-        p_notes: null,
+        p_reference_number: reference_number
+          ? String(reference_number).trim()
+          : null,
+        p_notes: notes ? String(notes).trim() : null,
       },
     );
 
@@ -151,6 +153,12 @@ export async function POST(request: Request) {
       );
       return NextResponse.json({ error: fetchError.message }, { status: 500 });
     }
+
+    // Reconcile live inventory for all purchased products across all suppliers
+    await syncProductsInventory(
+      supabaseAdmin,
+      items.map((i: any) => i.product_id),
+    );
 
     return NextResponse.json({ data: purchase });
   } catch (err: any) {
@@ -201,6 +209,10 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    if (data?.product_id) {
+      await syncProductsInventory(supabaseAdmin, [data.product_id]);
+    }
+
     return NextResponse.json({ data });
   } catch (err: any) {
     console.error("[API /api/pos/purchases PATCH] Unexpected error:", err);
@@ -208,5 +220,51 @@ export async function PATCH(request: Request) {
       { error: err?.message || "Internal server error" },
       { status: 500 },
     );
+  }
+}
+
+async function syncProductsInventory(supabaseAdmin: any, productIds: string[]) {
+  if (!productIds || productIds.length === 0) return;
+  const uniqueIds = Array.from(new Set(productIds.filter(Boolean)));
+  try {
+    const [{ data: pItems }, { data: sItems }] = await Promise.all([
+      supabaseAdmin
+        .from("pos_purchase_items")
+        .select("product_id, quantity")
+        .in("product_id", uniqueIds),
+      supabaseAdmin
+        .from("pos_sale_items")
+        .select("product_id, quantity")
+        .in("product_id", uniqueIds),
+    ]);
+
+    const pMap = new Map<string, number>();
+    for (const item of pItems || []) {
+      pMap.set(
+        item.product_id,
+        (pMap.get(item.product_id) || 0) + Number(item.quantity || 0),
+      );
+    }
+
+    const sMap = new Map<string, number>();
+    for (const item of sItems || []) {
+      sMap.set(
+        item.product_id,
+        (sMap.get(item.product_id) || 0) + Number(item.quantity || 0),
+      );
+    }
+
+    const nowIso = new Date().toISOString();
+    const upserts = uniqueIds.map((id) => ({
+      product_id: id,
+      quantity: Math.max(0, (pMap.get(id) || 0) - (sMap.get(id) || 0)),
+      updated_at: nowIso,
+    }));
+
+    await supabaseAdmin
+      .from("pos_inventory")
+      .upsert(upserts, { onConflict: "product_id" });
+  } catch (e) {
+    console.error("[syncProductsInventory] error:", e);
   }
 }

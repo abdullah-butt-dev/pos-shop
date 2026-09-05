@@ -300,27 +300,6 @@ export default function SettingsPage() {
                         placeholder="Suraj Miani Road, Multan"
                       />
                     </div>
-
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="currency"
-                        className="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
-                      >
-                        Currency
-                      </label>
-                      <input
-                        id="currency"
-                        value={businessForm.currency}
-                        onChange={(e) =>
-                          setBusinessForm((f) => ({
-                            ...f,
-                            currency: e.target.value,
-                          }))
-                        }
-                        className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-[var(--pos-brand)]"
-                        placeholder="PKR"
-                      />
-                    </div>
                   </div>
 
                   <div className="flex justify-end pt-2">

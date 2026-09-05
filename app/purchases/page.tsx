@@ -19,12 +19,7 @@ import {
   AutocompleteField,
   type AutocompleteOption,
 } from "@/components/purchases/autocomplete-field";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { InfoTooltip } from "@/components/pos/info-tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   PosInventoryService,
@@ -512,7 +507,7 @@ export default function PurchasesPage() {
                                 idx === 0 ? "block" : "block sm:hidden",
                               )}
                             >
-                              Line total
+                              Item Total
                             </label>
                             <div className="px-3 py-2.5 text-sm font-semibold text-foreground/80 truncate">
                               {formatMoney(qty * cost)}
@@ -534,83 +529,55 @@ export default function PurchasesPage() {
 
                   <div className="grid gap-4 sm:grid-cols-3 items-end">
                     <div className="sm:col-span-2">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
-                        Payment Mode
-                      </label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
+                          Payment Mode
+                        </label>
+                        <InfoTooltip
+                          title="Payment Mode"
+                          text="Paid: You pay the supplier in full right now. Partial: You pay some now and the remaining balance is tracked in Payables. Credit: No upfront payment, full bill added to Payables."
+                          side="top"
+                        />
+                      </div>
                       <div className="flex gap-2">
-                        <TooltipProvider delayDuration={300}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handlePaymentMethodChange("Paid")
-                                }
-                                className={cn(
-                                  "flex-1 px-3 py-2.5 text-sm font-semibold rounded-xl border transition-colors",
-                                  paymentMethod === "Paid"
-                                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                                    : "bg-foreground/5 border-foreground/10 text-muted-foreground hover:bg-foreground/10",
-                                )}
-                              >
-                                Paid
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              <p className="text-sm">
-                                Full amount paid upfront
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
+                        <button
+                          type="button"
+                          onClick={() => handlePaymentMethodChange("Paid")}
+                          className={cn(
+                            "flex-1 px-3 py-2.5 text-sm font-semibold rounded-xl border transition-colors",
+                            paymentMethod === "Paid"
+                              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                              : "bg-foreground/5 border-foreground/10 text-muted-foreground hover:bg-foreground/10",
+                          )}
+                        >
+                          Paid
+                        </button>
 
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handlePaymentMethodChange("Partial")
-                                }
-                                className={cn(
-                                  "flex-1 px-3 py-2.5 text-sm font-semibold rounded-xl border transition-colors",
-                                  paymentMethod === "Partial"
-                                    ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
-                                    : "bg-foreground/5 border-foreground/10 text-muted-foreground hover:bg-foreground/10",
-                                )}
-                              >
-                                Partial
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              <p className="text-sm">
-                                Part of the amount paid now, rest owed
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
+                        <button
+                          type="button"
+                          onClick={() => handlePaymentMethodChange("Partial")}
+                          className={cn(
+                            "flex-1 px-3 py-2.5 text-sm font-semibold rounded-xl border transition-colors",
+                            paymentMethod === "Partial"
+                              ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                              : "bg-foreground/5 border-foreground/10 text-muted-foreground hover:bg-foreground/10",
+                          )}
+                        >
+                          Partial
+                        </button>
 
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handlePaymentMethodChange("Credit")
-                                }
-                                className={cn(
-                                  "flex-1 px-3 py-2.5 text-sm font-semibold rounded-xl border transition-colors",
-                                  paymentMethod === "Credit"
-                                    ? "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400"
-                                    : "bg-foreground/5 border-foreground/10 text-muted-foreground hover:bg-foreground/10",
-                                )}
-                              >
-                                Credit
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              <p className="text-sm">
-                                No payment made, full amount owed to supplier
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        <button
+                          type="button"
+                          onClick={() => handlePaymentMethodChange("Credit")}
+                          className={cn(
+                            "flex-1 px-3 py-2.5 text-sm font-semibold rounded-xl border transition-colors",
+                            paymentMethod === "Credit"
+                              ? "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400"
+                              : "bg-foreground/5 border-foreground/10 text-muted-foreground hover:bg-foreground/10",
+                          )}
+                        >
+                          Credit
+                        </button>
                       </div>
                     </div>
                     <div className="sm:text-right">
