@@ -219,6 +219,8 @@ export async function GET(request: Request) {
         receivables,
         payables,
 
+        total_products: inventory.length,
+
         stock_units: stockRows.reduce(
           (sum: number, row: any) => sum + row.quantity,
           0,

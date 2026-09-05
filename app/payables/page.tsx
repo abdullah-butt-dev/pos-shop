@@ -2,7 +2,14 @@
 
 import type React from "react";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock, Loader2, Receipt, Wallet } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  Loader2,
+  Receipt,
+  Wallet,
+} from "lucide-react";
 import { toast } from "sonner";
 import { NavHeader } from "@/components/pos/nav-header";
 import {
@@ -66,8 +73,6 @@ export default function PayablesPage() {
   const [payingPurchaseId, setPayingPurchaseId] = useState<string | null>(null);
   const [payAmount, setPayAmount] = useState("");
   const [payDate, setPayDate] = useState(todayISO);
-  const [payMethod, setPayMethod] = useState("");
-  const [payNotes, setPayNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const [purchaseTab, setPurchaseTab] = useState<"outstanding" | "paid">(
@@ -78,8 +83,6 @@ export default function PayablesPage() {
     purchase: PosPurchaseWithRelations;
     amount: number;
     date: string;
-    method: string;
-    notes: string;
   } | null>(null);
 
   const loadPurchases = useCallback(async () => {
@@ -163,8 +166,6 @@ export default function PayablesPage() {
     setPayingPurchaseId(purchase.id);
     setPayAmount(String(Number(purchase.amount_due) || ""));
     setPayDate(todayISO());
-    setPayMethod("");
-    setPayNotes("");
   }
 
   function closePaymentForm() {
@@ -188,8 +189,6 @@ export default function PayablesPage() {
       purchase,
       amount,
       date: payDate,
-      method: payMethod,
-      notes: payNotes,
     });
   }
 
@@ -203,8 +202,6 @@ export default function PayablesPage() {
         purchase_id: pendingPayment.purchase.id,
         amount: pendingPayment.amount,
         payment_date: pendingPayment.date,
-        payment_method: pendingPayment.method.trim() || undefined,
-        notes: pendingPayment.notes.trim() || undefined,
       });
 
       toast.success("Payment recorded");
@@ -252,7 +249,7 @@ export default function PayablesPage() {
 
           <div className="flex flex-col lg:flex-row gap-5">
             {/* Supplier list */}
-            <div className="pos-panel rounded-xl p-4 flex flex-col gap-3 w-full lg:w-80 shrink-0 h-[400px] lg:h-[600px]">
+            <div className="pos-panel rounded-xl p-4 flex flex-col gap-3 w-full lg:w-80 shrink-0">
               <h2 className="text-sm font-bold flex items-center gap-2">
                 <Receipt className="w-4 h-4" /> Suppliers
               </h2>
@@ -318,7 +315,7 @@ export default function PayablesPage() {
             {/* Detail: purchases + payment history for the selected supplier */}
             <div className="flex-1 flex flex-col gap-5 min-w-0">
               {!selectedSupplier ? (
-                <div className="pos-panel rounded-xl p-8 flex items-center justify-center text-sm text-muted-foreground h-[400px] lg:h-[600px]">
+                <div className="pos-panel rounded-xl p-8 flex items-center justify-center text-sm text-muted-foreground min-h-[300px]">
                   Select a supplier to view purchases and record payments
                 </div>
               ) : (
@@ -474,7 +471,7 @@ export default function PayablesPage() {
                                           onSubmit={(e) =>
                                             handleRecordPayment(e, p)
                                           }
-                                          className="bg-foreground/5 rounded-xl p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end"
+                                          className="bg-foreground/5 rounded-xl p-4 grid gap-3 sm:grid-cols-3 items-end"
                                         >
                                           <div>
                                             <label
@@ -493,7 +490,7 @@ export default function PayablesPage() {
                                               onChange={(e) =>
                                                 setPayAmount(e.target.value)
                                               }
-                                              className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
+                                              className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition font-semibold"
                                             />
                                             <p className="text-[10px] text-muted-foreground mt-1">
                                               Remaining: {formatMoney(due)}
@@ -516,60 +513,24 @@ export default function PayablesPage() {
                                               className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
                                             />
                                           </div>
-                                          <div>
-                                            <label
-                                              htmlFor={`method-${p.id}`}
-                                              className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2"
-                                            >
-                                              Method (optional)
-                                            </label>
-                                            <input
-                                              id={`method-${p.id}`}
-                                              type="text"
-                                              value={payMethod}
-                                              onChange={(e) =>
-                                                setPayMethod(e.target.value)
-                                              }
-                                              placeholder="e.g. Cash"
-                                              className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
-                                            />
-                                          </div>
-                                          <div className="flex gap-2 w-full lg:col-span-1">
+                                          <div className="flex gap-2 w-full">
                                             <button
                                               type="submit"
                                               disabled={submitting}
-                                              className="flex-1 px-3 py-2 rounded-xl bg-pos-brand text-black text-xs font-bold transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                                              className="flex-1 px-3 py-2.5 rounded-xl bg-pos-brand text-black text-xs font-bold transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                                             >
                                               {submitting && (
                                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                               )}
-                                              Save
+                                              Save Payment
                                             </button>
                                             <button
                                               type="button"
                                               onClick={closePaymentForm}
-                                              className="px-3 py-2 rounded-xl bg-foreground/10 text-xs font-semibold transition active:scale-[0.98]"
+                                              className="px-3 py-2.5 rounded-xl bg-foreground/10 text-xs font-semibold transition active:scale-[0.98]"
                                             >
                                               Cancel
                                             </button>
-                                          </div>
-                                          <div className="sm:col-span-2 lg:col-span-4">
-                                            <label
-                                              htmlFor={`notes-${p.id}`}
-                                              className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2"
-                                            >
-                                              Notes (optional)
-                                            </label>
-                                            <input
-                                              id={`notes-${p.id}`}
-                                              type="text"
-                                              value={payNotes}
-                                              onChange={(e) =>
-                                                setPayNotes(e.target.value)
-                                              }
-                                              placeholder="Reference, cheque #, etc."
-                                              className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
-                                            />
                                           </div>
                                         </form>
                                       </td>
@@ -584,10 +545,16 @@ export default function PayablesPage() {
                     </div>
                   </div>
 
-                  <div className="pos-panel rounded-xl p-4 flex flex-col gap-3 border border-[var(--pos-stroke)]">
-                    <h2 className="text-sm font-bold flex items-center gap-2">
-                      <Clock className="w-4 h-4" /> Payment History
-                    </h2>
+                  <details className="group pos-panel rounded-xl p-4 flex flex-col gap-3 border border-[var(--pos-stroke)]">
+                    <summary className="text-sm font-bold flex items-center justify-between cursor-pointer list-none select-none hover:opacity-80 transition">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4" /> Payment History
+                        <span className="text-xs font-normal text-muted-foreground ml-1">
+                          (Click to expand)
+                        </span>
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
+                    </summary>
                     {paymentsLoading ? (
                       <p className="text-sm text-muted-foreground">
                         Loading...
@@ -597,15 +564,13 @@ export default function PayablesPage() {
                         No payments recorded yet.
                       </p>
                     ) : (
-                      <div className="overflow-x-auto w-full">
+                      <div className="overflow-x-auto w-full pt-2 border-t border-[var(--pos-stroke)]">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider border-b border-[var(--pos-stroke)]">
                               <th className="py-2 pr-3">Payment Date</th>
                               <th className="py-2 pr-3">Against Purchase</th>
                               <th className="py-2 pr-3 text-right">Amount</th>
-                              <th className="py-2 pr-3">Method</th>
-                              <th className="py-2">Notes</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -627,19 +592,13 @@ export default function PayablesPage() {
                                 <td className="py-3 pr-3 text-right whitespace-nowrap font-semibold">
                                   {formatMoney(Number(pay.amount) || 0)}
                                 </td>
-                                <td className="py-3 pr-3 whitespace-nowrap">
-                                  {pay.payment_method || "—"}
-                                </td>
-                                <td className="py-3 text-muted-foreground">
-                                  {pay.notes || "—"}
-                                </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
                     )}
-                  </div>
+                  </details>
                 </>
               )}
             </div>

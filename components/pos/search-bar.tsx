@@ -1,23 +1,27 @@
-"use client"
+"use client";
 
-import { Search, X } from "lucide-react"
-import { useState } from "react"
+import { Search, X } from "lucide-react";
+import { useState } from "react";
 
-export function SearchBar({ onSearch }: { onSearch?: (query: string) => void }) {
-  const [value, setValue] = useState("")
+export function SearchBar({
+  onSearch,
+}: {
+  onSearch?: (query: string) => void;
+}) {
+  const [value, setValue] = useState("");
 
   const handleChange = (val: string) => {
-    setValue(val)
-    onSearch?.(val)
-  }
+    setValue(val);
+    onSearch?.(val);
+  };
 
   const handleClear = () => {
-    setValue("")
-    onSearch?.("")
-  }
+    setValue("");
+    onSearch?.("");
+  };
 
   return (
-    <div className="pos-panel flex items-center gap-2 px-3 py-2 w-80 relative focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-[var(--pos-brand)] focus-within:outline-none focus-within:ring-offset-background">
+    <div className="pos-panel flex items-center gap-2 px-3 py-2 w-full relative focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-[var(--pos-brand)] focus-within:outline-none focus-within:ring-offset-background">
       <Search className="h-4 w-4 text-foreground/70" aria-hidden />
       <input
         aria-label="Search"
@@ -36,5 +40,5 @@ export function SearchBar({ onSearch }: { onSearch?: (query: string) => void }) 
         </button>
       )}
     </div>
-  )
+  );
 }

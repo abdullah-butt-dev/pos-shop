@@ -90,8 +90,8 @@ export async function POST(request: Request) {
         })),
         p_amount_paid: Number(amount_paid) || 0,
         p_payment_method: payment_method || null,
-        p_reference_number: reference_number || null,
-        p_notes: notes || null,
+        p_reference_number: null,
+        p_notes: null,
       },
     );
 
@@ -143,6 +143,55 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: purchase });
   } catch (err: any) {
     console.error("[API /api/pos/purchases] Unexpected error:", err);
+    return NextResponse.json(
+      { error: err?.message || "Internal server error" },
+      { status: 500 },
+    );
+  }
+}
+
+// PATCH /api/pos/purchases -> edits a purchase item's quantity or unit_cost
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+    const { item_id, quantity, unit_cost } = body || {};
+
+    if (!item_id) {
+      return NextResponse.json(
+        { error: "item_id is required" },
+        { status: 400 },
+      );
+    }
+
+    const updates: Record<string, number> = {};
+    if (typeof quantity === "number" && quantity > 0)
+      updates.quantity = quantity;
+    if (typeof unit_cost === "number" && unit_cost >= 0)
+      updates.unit_cost = unit_cost;
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json(
+        { error: "Provide a valid quantity (>0) or unit_cost (>=0)" },
+        { status: 400 },
+      );
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await supabaseAdmin
+      .from("pos_purchase_items")
+      .update(updates)
+      .eq("id", item_id)
+      .select("*, pos_products(name)")
+      .single();
+
+    if (error) {
+      console.error("[API /api/pos/purchases PATCH] Supabase error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ data });
+  } catch (err: any) {
+    console.error("[API /api/pos/purchases PATCH] Unexpected error:", err);
     return NextResponse.json(
       { error: err?.message || "Internal server error" },
       { status: 500 },

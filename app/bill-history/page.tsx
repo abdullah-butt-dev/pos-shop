@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Download, ReceiptText, RefreshCw, Search } from "lucide-react";
 
 import { NavHeader } from "@/components/pos/nav-header";
-import { generatePosReceiptPDF } from "@/lib/pos-receipt-pdf";
+import {
+  generatePosReceiptPDF,
+  formatPakistanDateTime,
+} from "@/lib/pos-receipt-pdf";
 
 export default function BillHistoryPage() {
   const [sales, setSales] = useState<any[]>([]);
@@ -67,7 +70,7 @@ export default function BillHistoryPage() {
 
       receiptNumber: sale.receipt_number,
 
-      dateTime: new Date(sale.created_at).toLocaleString("en-PK"),
+      dateTime: formatPakistanDateTime(sale.created_at),
 
       customerName: sale.pos_customers?.name || "Walk-in Customer",
 

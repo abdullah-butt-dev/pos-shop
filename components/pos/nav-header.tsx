@@ -1,10 +1,11 @@
-"use client"
+"use client";
 
-import { useMemo, useState } from "react"
+import { useMemo, useState } from "react";
 import {
   ArrowLeft,
   Home,
   LayoutDashboard,
+  LogOut,
   Menu,
   Package,
   Receipt,
@@ -13,43 +14,55 @@ import {
   Truck,
   Users,
   Wallet,
-} from "lucide-react"
-import { usePathname } from "next/navigation"
-import Link from "next/link"
-import { cn } from "@/lib/utils"
+} from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@/components/ui/sheet"
+} from "@/components/ui/sheet";
 
 const navItems = [
   { icon: ShoppingCart, label: "New Sale", href: "/orders" },
+  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+  { icon: Truck, label: "Inventory & Purchases", href: "/purchases" },
   { icon: Package, label: "Products & Suppliers", href: "/inventory" },
-  { icon: Truck, label: "Inventory / Purchases", href: "/purchases" },
   { icon: Wallet, label: "Payables", href: "/payables" },
   { icon: Users, label: "Receivables", href: "/receivables" },
-  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: Settings, label: "Settings", href: "/settings" },
-]
+];
 
 function getPageTitle(pathname: string): string {
-  const match = navItems.find((item) => item.href === pathname)
-  if (match) return match.label
-  if (pathname === "/") return "Home"
-  if (pathname === "/bill-history") return "Bill History"
-  if (pathname === "/financials") return "Dashboard"
-  if (pathname === "/login") return "Sign In"
-  return "Perfect Traders"
+  const match = navItems.find((item) => item.href === pathname);
+  if (match) return match.label;
+  if (pathname === "/") return "Home";
+  if (pathname === "/bill-history") return "Bill History";
+  if (pathname === "/financials") return "Dashboard";
+  if (pathname === "/login") return "Sign In";
+  return "Perfect Traders";
 }
 
 export function NavHeader() {
-  const pathname = usePathname()
-  const [open, setOpen] = useState(false)
-  const pageTitle = getPageTitle(pathname)
-  const isHome = pathname === "/"
+  const pathname = usePathname();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const pageTitle = getPageTitle(pathname);
+  const isHome = pathname === "/";
+
+  const handleSignOut = async () => {
+    setOpen(false);
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("Sign out error:", err);
+    }
+    router.replace("/login");
+  };
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-[var(--pos-stroke)] bg-[var(--pos-panel)]">
@@ -81,48 +94,64 @@ export function NavHeader() {
             </button>
           </SheetTrigger>
 
-          <SheetContent side="right" className="w-72 p-0 bg-[var(--pos-panel)]">
-            <SheetHeader className="px-4 pt-5 pb-3 border-b border-[var(--pos-stroke)]">
-              <SheetTitle className="text-left text-base font-semibold">
-                Perfect Traders
-              </SheetTitle>
-            </SheetHeader>
+          <SheetContent
+            side="right"
+            className="w-72 p-0 bg-[var(--pos-panel)] flex flex-col justify-between"
+          >
+            <div>
+              <SheetHeader className="px-4 pt-5 pb-3 border-b border-[var(--pos-stroke)]">
+                <SheetTitle className="text-left text-base font-semibold">
+                  Perfect Traders
+                </SheetTitle>
+              </SheetHeader>
 
-            <nav className="p-3 grid gap-1">
-              <Link
-                href="/"
-                onClick={() => setOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition min-h-[44px]",
-                  pathname === "/"
-                    ? "bg-[var(--pos-brand)] text-[oklch(0.15_0_0)] shadow-md"
-                    : "text-foreground/70 hover:bg-foreground/[0.06] hover:text-foreground"
-                )}
-              >
-                <Home size={18} />
-                Home
-              </Link>
-
-              {navItems.map((item) => (
+              <nav className="p-3 grid gap-1">
                 <Link
-                  key={item.href}
-                  href={item.href}
+                  href="/"
                   onClick={() => setOpen(false)}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition min-h-[44px]",
-                    pathname === item.href
+                    pathname === "/"
                       ? "bg-[var(--pos-brand)] text-[oklch(0.15_0_0)] shadow-md"
-                      : "text-foreground/70 hover:bg-foreground/[0.06] hover:text-foreground"
+                      : "text-foreground/70 hover:bg-foreground/[0.06] hover:text-foreground",
                   )}
                 >
-                  <item.icon size={18} />
-                  {item.label}
+                  <Home size={18} />
+                  Home
                 </Link>
-              ))}
-            </nav>
+
+                {navItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition min-h-[44px]",
+                      pathname === item.href
+                        ? "bg-[var(--pos-brand)] text-[oklch(0.15_0_0)] shadow-md"
+                        : "text-foreground/70 hover:bg-foreground/[0.06] hover:text-foreground",
+                    )}
+                  >
+                    <item.icon size={18} />
+                    {item.label}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+
+            <div className="p-3 border-t border-[var(--pos-stroke)]">
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 transition min-h-[44px]"
+              >
+                <LogOut size={18} />
+                Sign Out
+              </button>
+            </div>
           </SheetContent>
         </Sheet>
       </div>
     </header>
-  )
+  );
 }

@@ -273,8 +273,6 @@ export interface PosPurchaseItemInput {
 export interface PosCreatePurchaseInput {
   supplier_id: string;
   purchase_date: string;
-  reference_number?: string;
-  notes?: string;
   items: PosPurchaseItemInput[];
   amount_paid: number;
   payment_method?: string;
@@ -324,6 +322,25 @@ export class PosPurchaseService {
       throw new Error(msg);
     }
 
+    return json.data;
+  }
+
+  static async updateItem(
+    itemId: string,
+    data: { quantity?: number; unit_cost?: number },
+  ): Promise<any> {
+    const res = await fetch("/api/pos/purchases", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item_id: itemId, ...data }),
+    });
+
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      const msg = json.error || "Failed to update purchase item";
+      console.error("Error updating purchase item:", msg);
+      throw new Error(msg);
+    }
     return json.data;
   }
 }
@@ -641,5 +658,24 @@ export class PosCustomerPaymentService {
         ? error
         : new Error("Failed to record payment");
     }
+  }
+
+  static async update(
+    paymentId: string,
+    data: { amount?: number; payment_date?: string },
+  ): Promise<PosCustomerPaymentWithSale> {
+    const res = await fetch("/api/pos/customer-payments", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ payment_id: paymentId, ...data }),
+    });
+
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      const msg = json.error || "Failed to update payment";
+      console.error("Error updating customer payment:", msg);
+      throw new Error(msg);
+    }
+    return json.data;
   }
 }

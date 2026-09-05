@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   CalendarDays,
+  ChevronDown,
   Clock,
   Download,
   Package,
@@ -18,7 +19,10 @@ import {
 } from "lucide-react";
 
 import { NavHeader } from "@/components/pos/nav-header";
-import { generatePosReceiptPDF } from "@/lib/pos-receipt-pdf";
+import {
+  generatePosReceiptPDF,
+  formatPakistanDateTime,
+} from "@/lib/pos-receipt-pdf";
 
 type DashboardData = {
   settings: {
@@ -37,6 +41,7 @@ type DashboardData = {
     payables: number;
     stock_units: number;
     low_stock_count: number;
+    total_products?: number;
   };
   sales: any[];
   low_stock: any[];
@@ -147,11 +152,12 @@ export default function DashboardPage() {
   const profit = data?.summary.profit || 0;
   const receivables = data?.summary.receivables || 0;
   const payables = data?.summary.payables || 0;
+  const totalProducts = data?.summary?.total_products || 0;
   const stockUnits = data?.summary.stock_units || 0;
   const lowStock = data?.low_stock || [];
 
   const recentSales = useMemo(() => {
-    return (data?.sales || []).slice(0, 10);
+    return data?.sales || [];
   }, [data]);
 
   const downloadReceipt = (sale: any) => {
@@ -162,7 +168,7 @@ export default function DashboardPage() {
       shopAddress: data?.settings?.shop_address,
       shopPhone: data?.settings?.shop_phone,
       receiptNumber: sale.receipt_number,
-      dateTime: new Date(sale.created_at).toLocaleString("en-PK"),
+      dateTime: formatPakistanDateTime(sale.created_at),
       customerName: sale.pos_customers?.name || "Walk-in Customer",
       items: items.map((item: any) => ({
         name: item.pos_products?.name || "Product",
@@ -336,9 +342,9 @@ export default function DashboardPage() {
               />
               <StatCard
                 icon={Package}
-                label="Current Stock"
-                value={stockUnits.toLocaleString("en-PK")}
-                description="Total units currently in inventory"
+                label="Total Products"
+                value={totalProducts.toLocaleString("en-PK")}
+                description="Total active products in catalog"
                 href="/inventory"
               />
               <StatCard
@@ -366,27 +372,34 @@ export default function DashboardPage() {
             />
           </section>
 
-          {/* Recent Sales */}
-          <section className="pos-panel rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-[var(--pos-stroke)] flex items-center justify-between">
+          {/* Recent Sales (Collapsible, closed by default) */}
+          <details className="group pos-panel rounded-xl overflow-hidden border border-[var(--pos-stroke)]">
+            <summary className="p-4 flex items-center justify-between cursor-pointer list-none select-none hover:bg-foreground/[0.02] transition">
               <div>
                 <h2 className="font-semibold flex items-center gap-2">
                   <Receipt className="w-4 h-4 text-[var(--pos-brand)]" />
                   Recent Sales
+                  <span className="text-xs font-normal text-muted-foreground ml-1">
+                    (Click to expand)
+                  </span>
                 </h2>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Latest 10 sales for the selected period.
+                  Sales records with PDF receipt download.
                 </p>
               </div>
-              <Link
-                href="/bill-history"
-                className="text-xs text-[var(--pos-brand)] hover:underline font-medium"
-              >
-                View All Sales →
-              </Link>
-            </div>
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/bill-history"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-xs text-[var(--pos-brand)] hover:underline font-medium"
+                >
+                  View All Sales →
+                </Link>
+                <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
+              </div>
+            </summary>
 
-            <div className="overflow-x-auto">
+            <div className="border-t border-[var(--pos-stroke)] overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs text-muted-foreground border-b border-[var(--pos-stroke)]">
@@ -439,7 +452,7 @@ export default function DashboardPage() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </details>
         </div>
       </div>
     </main>

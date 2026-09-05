@@ -131,15 +131,9 @@ export default function SettingsPage() {
     }
 
     const threshold = Number(businessForm.default_low_stock_threshold);
-    const taxRate = Number(businessForm.tax_rate);
 
     if (!Number.isFinite(threshold) || threshold < 0) {
       toast.error("Default low stock threshold must be zero or greater");
-      return;
-    }
-
-    if (!Number.isFinite(taxRate) || taxRate < 0) {
-      toast.error("Tax rate must be zero or greater");
       return;
     }
 
@@ -150,9 +144,9 @@ export default function SettingsPage() {
         currency: businessForm.currency.trim() || "PKR",
         address: businessForm.address.trim(),
         phone: businessForm.phone.trim(),
-        invoice_prefix: businessForm.invoice_prefix.trim() || "PT",
+        invoice_prefix: "PT",
         default_low_stock_threshold: threshold,
-        tax_rate: taxRate,
+        tax_rate: 0,
       });
       if (updated) setBusinessForm(toForm(updated));
       toast.success("Business settings saved");
@@ -360,50 +354,6 @@ export default function SettingsPage() {
                         }
                         className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-[var(--pos-brand)]"
                         placeholder="PKR"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="invoice-prefix"
-                        className="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
-                      >
-                        Receipt Prefix
-                      </label>
-                      <input
-                        id="invoice-prefix"
-                        value={businessForm.invoice_prefix}
-                        onChange={(e) =>
-                          setBusinessForm((f) => ({
-                            ...f,
-                            invoice_prefix: e.target.value,
-                          }))
-                        }
-                        className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-[var(--pos-brand)]"
-                        placeholder="PT"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="tax-rate"
-                        className="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
-                      >
-                        Tax Rate (%)
-                      </label>
-                      <input
-                        id="tax-rate"
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        value={businessForm.tax_rate}
-                        onChange={(e) =>
-                          setBusinessForm((f) => ({
-                            ...f,
-                            tax_rate: e.target.value,
-                          }))
-                        }
-                        className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-[var(--pos-brand)]"
                       />
                     </div>
 

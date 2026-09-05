@@ -23,7 +23,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { generatePosReceiptPDF } from "@/lib/pos-receipt-pdf";
+import {
+  generatePosReceiptPDF,
+  formatPakistanDateTime,
+} from "@/lib/pos-receipt-pdf";
 
 type PaymentMode = "paid" | "credit" | "partial";
 
@@ -171,7 +174,7 @@ export function OrderSummary({
           receiptNumber:
             (saleResult as any)?.receipt_number ||
             `PT-${Date.now().toString().slice(-4)}`,
-          dateTime: new Date().toLocaleString("en-PK"),
+          dateTime: formatPakistanDateTime(new Date()),
           customerName: customer?.name || "Walk-in Customer",
           items: items.map((i) => ({
             name: i.name,
@@ -255,7 +258,10 @@ export function OrderSummary({
           <div className="flex-1 overflow-y-auto scrollbar-thin pr-1 min-h-0">
             <div className="grid gap-3">
               {items.map((item, index) => (
-                <div key={item.id} className="pos-panel rounded-xl p-3 bg-foreground/[0.02]">
+                <div
+                  key={item.id}
+                  className="pos-panel rounded-xl p-3 bg-foreground/[0.02]"
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="pos-panel h-6 w-6 shrink-0 rounded-full grid place-items-center text-xs font-medium">
@@ -374,7 +380,9 @@ export function OrderSummary({
               </div>
 
               <div>
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Payment Mode</label>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Payment Mode
+                </label>
 
                 <div className="grid grid-cols-3 gap-2 mt-2">
                   <button
@@ -447,7 +455,9 @@ export function OrderSummary({
               )}
 
               <div className="flex items-center justify-between text-sm pt-2">
-                <span className="text-muted-foreground font-medium">Remaining Due</span>
+                <span className="text-muted-foreground font-medium">
+                  Remaining Due
+                </span>
 
                 <span
                   className={

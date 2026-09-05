@@ -5,11 +5,14 @@ import type React from "react";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
+  ChevronDown,
   Clock,
   Loader2,
+  Pencil,
   UserPlus,
   Users,
   Wallet,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { NavHeader } from "@/components/pos/nav-header";
@@ -84,13 +87,20 @@ export default function ReceivablesPage() {
   const [payingSaleId, setPayingSaleId] = useState<string | null>(null);
   const [payAmount, setPayAmount] = useState("");
   const [payDate, setPayDate] = useState(todayISO);
-  const [payMethod, setPayMethod] = useState("");
-  const [payNotes, setPayNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [paymentToConfirm, setPaymentToConfirm] = useState<{
     sale: PosSaleWithRelations;
     amount: number;
   } | null>(null);
+
+  const [editingPayment, setEditingPayment] = useState<{
+    id: string;
+    amount: number;
+    payment_date: string;
+  } | null>(null);
+  const [editPayAmount, setEditPayAmount] = useState("");
+  const [editPayDate, setEditPayDate] = useState("");
+  const [editPayLoading, setEditPayLoading] = useState(false);
 
   const loadSales = useCallback(async () => {
     setSalesLoading(true);
@@ -105,6 +115,31 @@ export default function ReceivablesPage() {
     setPayments(data);
     setPaymentsLoading(false);
   }, []);
+
+  const handleSaveEditPayment = async () => {
+    if (!editingPayment || !selectedCustomer) return;
+    const amount = Number(editPayAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Enter a valid payment amount greater than 0");
+      return;
+    }
+
+    setEditPayLoading(true);
+    try {
+      await PosCustomerPaymentService.update(editingPayment.id, {
+        amount,
+        payment_date: editPayDate || undefined,
+      });
+      toast.success("Payment updated successfully");
+      setEditingPayment(null);
+      await loadSales();
+      await loadPayments(selectedCustomer.id);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update payment");
+    } finally {
+      setEditPayLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadSales();
@@ -177,8 +212,6 @@ export default function ReceivablesPage() {
     setPayingSaleId(sale.id);
     setPayAmount(String(Number(sale.amount_due) || ""));
     setPayDate(todayISO());
-    setPayMethod("");
-    setPayNotes("");
   }
 
   function closePaymentForm() {
@@ -211,8 +244,6 @@ export default function ReceivablesPage() {
         sale_id: paymentToConfirm.sale.id,
         amount: paymentToConfirm.amount,
         payment_date: payDate,
-        payment_method: payMethod.trim() || undefined,
-        notes: payNotes.trim() || undefined,
       });
 
       toast.success("Payment recorded");
@@ -464,7 +495,7 @@ export default function ReceivablesPage() {
                                           onSubmit={(e) =>
                                             handleRecordPayment(e, s)
                                           }
-                                          className="bg-foreground/5 rounded-xl p-4 grid gap-3 grid-cols-1 sm:grid-cols-4 items-end"
+                                          className="bg-foreground/5 rounded-xl p-4 grid gap-3 sm:grid-cols-3 items-end"
                                         >
                                           <div>
                                             <label
@@ -483,7 +514,7 @@ export default function ReceivablesPage() {
                                               onChange={(e) =>
                                                 setPayAmount(e.target.value)
                                               }
-                                              className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
+                                              className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition font-semibold"
                                             />
                                             <p className="text-[10px] text-muted-foreground mt-1">
                                               Remaining: {formatMoney(due)}
@@ -506,29 +537,11 @@ export default function ReceivablesPage() {
                                               className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
                                             />
                                           </div>
-                                          <div>
-                                            <label
-                                              htmlFor={`method-${s.id}`}
-                                              className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2"
-                                            >
-                                              Method (optional)
-                                            </label>
-                                            <input
-                                              id={`method-${s.id}`}
-                                              type="text"
-                                              value={payMethod}
-                                              onChange={(e) =>
-                                                setPayMethod(e.target.value)
-                                              }
-                                              placeholder="e.g. Cash"
-                                              className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
-                                            />
-                                          </div>
                                           <div className="flex gap-2">
                                             <button
                                               type="submit"
                                               disabled={submitting}
-                                              className="flex-1 px-3 py-2 rounded-xl bg-pos-brand text-black text-xs font-bold transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                                              className="flex-1 px-3 py-2.5 rounded-xl bg-pos-brand text-black text-xs font-bold transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                                             >
                                               {submitting && (
                                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -538,28 +551,10 @@ export default function ReceivablesPage() {
                                             <button
                                               type="button"
                                               onClick={closePaymentForm}
-                                              className="px-3 py-2 rounded-xl bg-foreground/10 text-xs font-semibold transition active:scale-[0.98]"
+                                              className="px-3 py-2.5 rounded-xl bg-foreground/10 text-xs font-semibold transition active:scale-[0.98]"
                                             >
                                               Cancel
                                             </button>
-                                          </div>
-                                          <div className="sm:col-span-4">
-                                            <label
-                                              htmlFor={`notes-${s.id}`}
-                                              className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2"
-                                            >
-                                              Notes (optional)
-                                            </label>
-                                            <input
-                                              id={`notes-${s.id}`}
-                                              type="text"
-                                              value={payNotes}
-                                              onChange={(e) =>
-                                                setPayNotes(e.target.value)
-                                              }
-                                              placeholder="Reference, cheque #, etc."
-                                              className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
-                                            />
                                           </div>
                                         </form>
                                       </td>
@@ -574,10 +569,16 @@ export default function ReceivablesPage() {
                     )}
                   </div>
 
-                  <div className="pos-panel rounded-lg p-4 flex flex-col gap-3">
-                    <h2 className="text-sm font-bold flex items-center gap-2">
-                      <Clock className="w-4 h-4" /> Payment History
-                    </h2>
+                  <details className="group pos-panel rounded-lg p-4 flex flex-col gap-3">
+                    <summary className="text-sm font-bold flex items-center justify-between cursor-pointer list-none select-none hover:opacity-80 transition">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4" /> Payment History
+                        <span className="text-xs font-normal text-muted-foreground ml-1">
+                          (Click to expand)
+                        </span>
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
+                    </summary>
                     {paymentsLoading ? (
                       <p className="text-sm text-muted-foreground">
                         Loading...
@@ -587,14 +588,14 @@ export default function ReceivablesPage() {
                         No payments recorded yet.
                       </p>
                     ) : (
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto pt-2 border-t border-[var(--pos-stroke)]">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider border-b border-[var(--pos-stroke)]">
                               <th className="py-2 pr-3">Payment Date</th>
                               <th className="py-2 pr-3">Against Sale</th>
                               <th className="py-2 pr-3 text-right">Amount</th>
-                              <th className="py-2 pr-3">Method</th>
+                              <th className="py-2 text-right">Action</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -614,8 +615,24 @@ export default function ReceivablesPage() {
                                 <td className="py-2 pr-3 text-right whitespace-nowrap font-semibold">
                                   {formatMoney(Number(pay.amount) || 0)}
                                 </td>
-                                <td className="py-2 pr-3 whitespace-nowrap">
-                                  {pay.payment_method || "—"}
+                                <td className="py-2 text-right whitespace-nowrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingPayment({
+                                        id: pay.id,
+                                        amount: Number(pay.amount) || 0,
+                                        payment_date: pay.payment_date,
+                                      });
+                                      setEditPayAmount(String(pay.amount));
+                                      setEditPayDate(pay.payment_date);
+                                    }}
+                                    className="p-1.5 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 transition inline-flex items-center gap-1 text-xs font-semibold"
+                                    title="Edit Payment"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                    Edit
+                                  </button>
                                 </td>
                               </tr>
                             ))}
@@ -623,7 +640,7 @@ export default function ReceivablesPage() {
                         </table>
                       </div>
                     )}
-                  </div>
+                  </details>
                 </>
               )}
             </div>
@@ -651,6 +668,76 @@ export default function ReceivablesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {editingPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="bg-[var(--pos-panel)] border border-[var(--pos-stroke)] rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-base">Edit Payment</h3>
+              <button
+                type="button"
+                onClick={() => setEditingPayment(null)}
+                className="p-1 rounded-lg hover:bg-foreground/10 text-muted-foreground transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Customer:{" "}
+              <span className="font-semibold text-foreground">
+                {selectedCustomer?.name}
+              </span>
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                  Payment Amount (Rs)
+                </label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={editPayAmount}
+                  onChange={(e) => setEditPayAmount(e.target.value)}
+                  className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pos-brand font-semibold"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                  Payment Date
+                </label>
+                <input
+                  type="date"
+                  value={editPayDate}
+                  onChange={(e) => setEditPayDate(e.target.value)}
+                  className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pos-brand"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--pos-stroke)]">
+              <button
+                type="button"
+                onClick={() => setEditingPayment(null)}
+                disabled={editPayLoading}
+                className="px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-foreground/5 rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEditPayment}
+                disabled={editPayLoading}
+                className="px-4 py-2 text-xs font-bold bg-[var(--pos-brand)] text-black rounded-xl hover:opacity-90 transition flex items-center gap-1.5"
+              >
+                {editPayLoading && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                )}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
