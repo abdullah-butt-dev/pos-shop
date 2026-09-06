@@ -22,7 +22,14 @@ export default function BillHistoryPage() {
       setError("");
 
       const response = await fetch(
-        "/api/pos/reports?from=2000-01-01&to=2999-12-31",
+        `/api/pos/reports?from=2000-01-01&to=2999-12-31&t=${Date.now()}`,
+        {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+          },
+        },
       );
 
       const json = await response.json();

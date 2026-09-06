@@ -39,6 +39,14 @@ export function getSupabaseAdmin(): SupabaseClient {
   if (!cachedClient) {
     cachedClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
+      global: {
+        fetch: (url, options = {}) => {
+          return fetch(url, {
+            ...options,
+            cache: "no-store",
+          });
+        },
+      },
     });
   }
 

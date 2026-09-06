@@ -94,7 +94,13 @@ export default function DashboardPage() {
 
       const response = await fetch(
         `/api/pos/reports?from=${from}&to=${to}&t=${Date.now()}`,
-        { cache: "no-store" },
+        {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+          },
+        },
       );
       const json = await response.json();
 
@@ -106,16 +112,36 @@ export default function DashboardPage() {
     } catch (err) {
       console.error("Failed to load dashboard:", err);
       setError(err instanceof Error ? err.message : "Failed to load dashboard");
+      setData(null);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleForceRefresh = async () => {
+    if (typeof window !== "undefined") {
+      if ("caches" in window) {
+        try {
+          const names = await caches.keys();
+          await Promise.all(names.map((n) => caches.delete(n)));
+        } catch (_) {}
+      }
+      if ("serviceWorker" in navigator) {
+        try {
+          const registrations =
+            await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map((r) => r.unregister()));
+        } catch (_) {}
+      }
+    }
+    await loadDashboard();
   };
 
   const selectFilter = (
     filter: "today" | "yesterday" | "week" | "month" | "custom",
   ) => {
     if (filter === dateFilter && filter !== "custom") {
-      loadDashboard();
+      handleForceRefresh();
     } else {
       setDateFilter(filter);
     }
@@ -252,7 +278,7 @@ export default function DashboardPage() {
 
               <button
                 type="button"
-                onClick={loadDashboard}
+                onClick={handleForceRefresh}
                 disabled={loading}
                 className="pos-panel rounded-xl p-2.5 hover:bg-foreground/5 transition disabled:opacity-50"
                 title="Refresh dashboard"
