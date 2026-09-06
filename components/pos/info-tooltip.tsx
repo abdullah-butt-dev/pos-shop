@@ -9,6 +9,7 @@ interface InfoTooltipProps {
   text: string;
   className?: string;
   side?: "top" | "bottom" | "left" | "right";
+  align?: "left" | "center" | "right" | "auto";
 }
 
 export function InfoTooltip({
@@ -16,9 +17,37 @@ export function InfoTooltip({
   text,
   className,
   side = "top",
+  align = "auto",
 }: InfoTooltipProps) {
   const [open, setOpen] = useState(false);
+  const [effectiveAlign, setEffectiveAlign] = useState<
+    "left" | "center" | "right"
+  >("center");
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open || !containerRef.current) return;
+
+    if (align !== "auto") {
+      setEffectiveAlign(align);
+      return;
+    }
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const tooltipWidth = 240;
+    const screenWidth = typeof window !== "undefined" ? window.innerWidth : 360;
+
+    // If too close to right edge, align right edge of tooltip with trigger
+    if (rect.left + tooltipWidth / 2 > screenWidth - 20) {
+      setEffectiveAlign("right");
+    }
+    // If too close to left edge, align left edge of tooltip with trigger
+    else if (rect.left - tooltipWidth / 2 < 20) {
+      setEffectiveAlign("left");
+    } else {
+      setEffectiveAlign("center");
+    }
+  }, [open, align]);
 
   useEffect(() => {
     if (!open) return;
@@ -47,6 +76,23 @@ export function InfoTooltip({
     };
   }, [open]);
 
+  const getPositionClasses = () => {
+    let classes = "";
+    if (side === "top") classes += "bottom-full mb-2 ";
+    else if (side === "bottom") classes += "top-full mt-2 ";
+    else if (side === "left") return "right-full top-1/2 -translate-y-1/2 mr-2";
+    else if (side === "right") return "left-full top-1/2 -translate-y-1/2 ml-2";
+
+    if (effectiveAlign === "left") {
+      classes += "left-0";
+    } else if (effectiveAlign === "right") {
+      classes += "right-0";
+    } else {
+      classes += "left-1/2 -translate-x-1/2";
+    }
+    return classes;
+  };
+
   return (
     <div
       ref={containerRef}
@@ -72,11 +118,8 @@ export function InfoTooltip({
           role="tooltip"
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            "absolute z-50 w-56 sm:w-64 p-3 rounded-xl border border-[var(--pos-stroke)] bg-[var(--pos-panel)] shadow-xl text-left pointer-events-auto animate-in fade-in zoom-in-95 duration-150",
-            side === "top" && "bottom-full left-1/2 -translate-x-1/2 mb-2",
-            side === "bottom" && "top-full left-1/2 -translate-x-1/2 mt-2",
-            side === "left" && "right-full top-1/2 -translate-y-1/2 mr-2",
-            side === "right" && "left-full top-1/2 -translate-y-1/2 ml-2",
+            "absolute z-50 w-56 sm:w-64 max-w-[calc(100vw-2.5rem)] p-3 rounded-xl border border-[var(--pos-stroke)] bg-[var(--pos-panel)] shadow-xl text-left pointer-events-auto animate-in fade-in zoom-in-95 duration-150",
+            getPositionClasses(),
           )}
         >
           {title && (

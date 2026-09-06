@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { getPakistanDate } from "@/lib/pos-date-utils";
 
 const SALE_SELECT =
   "*, pos_customers(name), pos_sale_items(*, pos_products(name))";
@@ -135,11 +136,45 @@ export async function POST(request: Request) {
       }
     }
 
-    const { data, error } = await supabaseAdmin.rpc("pos_create_sale", {
+    const saleDate =
+      body?.sale_date && /^\d{4}-\d{2}-\d{2}$/.test(String(body.sale_date))
+        ? String(body.sale_date)
+        : getPakistanDate();
+
+    // Call pos_create_sale with p_sale_date (or fallback to 3-param if DB has not yet applied 4-param)
+    let { data, error } = await supabaseAdmin.rpc("pos_create_sale", {
       p_customer_id: customerId,
       p_items: normalizedItems,
       p_paid_amount: paidAmount,
+      p_sale_date: saleDate,
     });
+
+    if (
+      error &&
+      (error.code === "PGRST202" ||
+        error.message?.toLowerCase().includes("schema cache") ||
+        error.message?.toLowerCase().includes("could not find the function") ||
+        error.message?.toLowerCase().includes("does not exist"))
+    ) {
+      console.warn(
+        "[API /api/pos/sales] 4-parameter pos_create_sale not found, falling back to 3-parameter",
+      );
+      const retry = await supabaseAdmin.rpc("pos_create_sale", {
+        p_customer_id: customerId,
+        p_items: normalizedItems,
+        p_paid_amount: paidAmount,
+      });
+      data = retry.data;
+      error = retry.error;
+
+      // If 3-param succeeded, ensure the sale has the merchant's Pakistan local date
+      if (!error && data) {
+        await supabaseAdmin
+          .from("pos_sales")
+          .update({ sale_date: saleDate })
+          .eq("id", data);
+      }
+    }
 
     if (error) {
       console.error("[API /api/pos/sales] Create error:", error);

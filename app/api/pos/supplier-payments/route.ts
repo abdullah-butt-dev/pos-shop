@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import { getPakistanDate } from '@/lib/pos-date-utils'
 
 const PAYMENT_SELECT = '*, pos_purchases(purchase_date, reference_number, total_amount)'
 
@@ -100,7 +101,7 @@ export async function POST(request: Request) {
           supplier_id,
           purchase_id,
           amount: numericAmount,
-          payment_date: payment_date || undefined,
+          payment_date: payment_date || getPakistanDate(),
           payment_method: payment_method || null,
           notes: notes || null,
         },

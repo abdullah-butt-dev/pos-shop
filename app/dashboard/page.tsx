@@ -13,8 +13,7 @@ import {
   RefreshCw,
   ShoppingCart,
   TrendingUp,
-  Users,
-  Wallet,
+  Truck,
 } from "lucide-react";
 
 import { NavHeader } from "@/components/pos/nav-header";
@@ -23,6 +22,12 @@ import {
   generatePosReceiptPDF,
   formatPakistanDateTime,
 } from "@/lib/pos-receipt-pdf";
+import {
+  getPakistanDate,
+  getPakistanYesterday,
+  getPakistanWeekStart,
+  getPakistanMonthStart,
+} from "@/lib/pos-date-utils";
 
 type DashboardData = {
   settings: {
@@ -45,32 +50,6 @@ type DashboardData = {
   sales: any[];
 };
 
-function getLocalDate() {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function getWeekStart() {
-  const d = new Date();
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  const start = new Date(d.setDate(diff));
-  const year = start.getFullYear();
-  const month = String(start.getMonth() + 1).padStart(2, "0");
-  const dd = String(start.getDate()).padStart(2, "0");
-  return `${year}-${month}-${dd}`;
-}
-
-function getMonthStart() {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${year}-${month}-01`;
-}
-
 function money(value: number, currency = "PKR") {
   return `${currency} ${Number(value || 0).toLocaleString("en-PK", {
     minimumFractionDigits: 2,
@@ -84,10 +63,10 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
 
   const [dateFilter, setDateFilter] = useState<
-    "today" | "week" | "month" | "custom"
+    "today" | "yesterday" | "week" | "month" | "custom"
   >("today");
-  const [customFrom, setCustomFrom] = useState(getLocalDate());
-  const [customTo, setCustomTo] = useState(getLocalDate());
+  const [customFrom, setCustomFrom] = useState(getPakistanDate());
+  const [customTo, setCustomTo] = useState(getPakistanDate());
 
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -96,19 +75,27 @@ export default function DashboardPage() {
       setLoading(true);
       setError("");
 
-      let from = getLocalDate();
-      let to = getLocalDate();
+      let from = getPakistanDate();
+      let to = getPakistanDate();
 
-      if (dateFilter === "week") {
-        from = getWeekStart();
+      if (dateFilter === "yesterday") {
+        from = getPakistanYesterday();
+        to = getPakistanYesterday();
+      } else if (dateFilter === "week") {
+        from = getPakistanWeekStart();
+        to = getPakistanDate();
       } else if (dateFilter === "month") {
-        from = getMonthStart();
+        from = getPakistanMonthStart();
+        to = getPakistanDate();
       } else if (dateFilter === "custom") {
         from = customFrom;
         to = customTo;
       }
 
-      const response = await fetch(`/api/pos/reports?from=${from}&to=${to}`);
+      const response = await fetch(
+        `/api/pos/reports?from=${from}&to=${to}&t=${Date.now()}`,
+        { cache: "no-store" },
+      );
       const json = await response.json();
 
       if (!response.ok || json.error) {
@@ -124,11 +111,42 @@ export default function DashboardPage() {
     }
   };
 
+  const selectFilter = (
+    filter: "today" | "yesterday" | "week" | "month" | "custom",
+  ) => {
+    if (filter === dateFilter && filter !== "custom") {
+      loadDashboard();
+    } else {
+      setDateFilter(filter);
+    }
+  };
+
   useEffect(() => {
     if (dateFilter !== "custom") {
       loadDashboard();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFilter]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      if (dateFilter !== "custom") {
+        loadDashboard();
+      }
+    };
+    window.addEventListener("focus", onFocus);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible" && dateFilter !== "custom") {
+        loadDashboard();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [dateFilter]);
 
   useEffect(() => {
@@ -147,13 +165,8 @@ export default function DashboardPage() {
   const shopName = data?.settings?.shop_name || "Perfect Traders";
 
   const sales = data?.summary.sales || 0;
+  const purchases = data?.summary.purchases || 0;
   const profit = data?.summary.profit || 0;
-  const customerPayments = data?.summary.customer_payments || 0;
-  const supplierPayments = data?.summary.supplier_payments || 0;
-  const receivables = data?.summary.receivables || 0;
-  const payables = data?.summary.payables || 0;
-  const totalProducts = data?.summary?.total_products || 0;
-  const stockUnits = data?.summary.stock_units || 0;
 
   const recentSales = useMemo(() => {
     return data?.sales || [];
@@ -194,6 +207,7 @@ export default function DashboardPage() {
 
   const getDateLabel = () => {
     if (dateFilter === "today") return "Today";
+    if (dateFilter === "yesterday") return "Yesterday";
     if (dateFilter === "week") return "This Week";
     if (dateFilter === "month") return "This Month";
     return `${customFrom} to ${customTo}`;
@@ -255,50 +269,61 @@ export default function DashboardPage() {
           <section className="pos-panel rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
             <div className="flex items-center gap-2 flex-wrap">
               <button
-                onClick={() => setDateFilter("today")}
-                className={`px-3 py-1.5 text-sm rounded-lg transition ${dateFilter === "today" ? "bg-[var(--pos-brand)] text-primary-foreground" : "bg-foreground/5 hover:bg-foreground/10"}`}
+                onClick={() => selectFilter("today")}
+                className={`px-3 py-1.5 text-sm rounded-lg transition ${dateFilter === "today" ? "bg-[var(--pos-brand)] text-primary-foreground font-semibold" : "bg-foreground/5 hover:bg-foreground/10"}`}
               >
                 Today
               </button>
               <button
-                onClick={() => setDateFilter("week")}
-                className={`px-3 py-1.5 text-sm rounded-lg transition ${dateFilter === "week" ? "bg-[var(--pos-brand)] text-primary-foreground" : "bg-foreground/5 hover:bg-foreground/10"}`}
+                onClick={() => selectFilter("yesterday")}
+                className={`px-3 py-1.5 text-sm rounded-lg transition ${dateFilter === "yesterday" ? "bg-[var(--pos-brand)] text-primary-foreground font-semibold" : "bg-foreground/5 hover:bg-foreground/10"}`}
+              >
+                Yesterday
+              </button>
+              <button
+                onClick={() => selectFilter("week")}
+                className={`px-3 py-1.5 text-sm rounded-lg transition ${dateFilter === "week" ? "bg-[var(--pos-brand)] text-primary-foreground font-semibold" : "bg-foreground/5 hover:bg-foreground/10"}`}
               >
                 This Week
               </button>
               <button
-                onClick={() => setDateFilter("month")}
-                className={`px-3 py-1.5 text-sm rounded-lg transition ${dateFilter === "month" ? "bg-[var(--pos-brand)] text-primary-foreground" : "bg-foreground/5 hover:bg-foreground/10"}`}
+                onClick={() => selectFilter("month")}
+                className={`px-3 py-1.5 text-sm rounded-lg transition ${dateFilter === "month" ? "bg-[var(--pos-brand)] text-primary-foreground font-semibold" : "bg-foreground/5 hover:bg-foreground/10"}`}
               >
                 This Month
               </button>
               <button
-                onClick={() => setDateFilter("custom")}
-                className={`px-3 py-1.5 text-sm rounded-lg transition ${dateFilter === "custom" ? "bg-[var(--pos-brand)] text-primary-foreground" : "bg-foreground/5 hover:bg-foreground/10"}`}
+                onClick={() => selectFilter("custom")}
+                className={`px-3 py-1.5 text-sm rounded-lg transition ${dateFilter === "custom" ? "bg-[var(--pos-brand)] text-primary-foreground font-semibold" : "bg-foreground/5 hover:bg-foreground/10"}`}
               >
-                Custom
+                Custom Range
               </button>
             </div>
 
             {dateFilter === "custom" && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <input
-                  type="date"
-                  value={customFrom}
-                  onChange={(e) => setCustomFrom(e.target.value)}
-                  className="rounded-lg border border-[var(--pos-stroke)] bg-foreground/5 px-2 py-1.5 text-sm"
-                />
-                <span className="text-muted-foreground text-sm">to</span>
-                <input
-                  type="date"
-                  value={customTo}
-                  onChange={(e) => setCustomTo(e.target.value)}
-                  className="rounded-lg border border-[var(--pos-stroke)] bg-foreground/5 px-2 py-1.5 text-sm"
-                />
+              <div className="flex items-center gap-3 flex-wrap pt-2 sm:pt-0">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="font-medium">From:</span>
+                  <input
+                    type="date"
+                    value={customFrom}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    className="rounded-lg border border-[var(--pos-stroke)] bg-foreground/5 px-2.5 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-[var(--pos-brand)]"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="font-medium">To:</span>
+                  <input
+                    type="date"
+                    value={customTo}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    className="rounded-lg border border-[var(--pos-stroke)] bg-foreground/5 px-2.5 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-[var(--pos-brand)]"
+                  />
+                </div>
                 <button
                   onClick={handleApplyFilter}
                   disabled={loading}
-                  className="px-3 py-1.5 bg-foreground text-background rounded-lg text-sm font-medium hover:bg-foreground/90 transition disabled:opacity-50"
+                  className="px-3.5 py-1.5 bg-foreground text-background rounded-lg text-xs font-semibold hover:bg-foreground/90 transition disabled:opacity-50 active:scale-[0.98]"
                 >
                   Apply
                 </button>
@@ -326,7 +351,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <StatCard
                 icon={ShoppingCart}
                 label="Sales"
@@ -335,35 +360,21 @@ export default function DashboardPage() {
                 tooltip="Total value of goods sold in this period."
               />
               <StatCard
+                icon={Truck}
+                label="Purchases"
+                value={money(purchases, currency)}
+                description="Cost of stock purchases"
+                href="/purchases"
+                tooltip="Total cost of inventory purchases recorded in this period."
+              />
+              <StatCard
                 icon={TrendingUp}
                 label="Profit"
                 value={money(profit, currency)}
-                description="Revenue minus FIFO cost"
-                tooltip="Total sales revenue minus the wholesale purchase cost (FIFO) of the items sold."
+                description="Net profit from sales"
+                tooltip="Total sales revenue minus the wholesale purchase cost of the items sold."
               />
             </div>
-          </section>
-
-          {/* Financial Balances & Catalog Summary */}
-          <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <BalanceCard
-              title="Total Customer Receivables"
-              value={money(receivables, currency)}
-              href="/receivables"
-              tooltip="Total money that customers currently owe to your store for goods bought on credit."
-            />
-            <BalanceCard
-              title="Total Supplier Payables"
-              value={money(payables, currency)}
-              href="/payables"
-              tooltip="Total money that your store currently owes to suppliers for stock bought on credit."
-            />
-            <BalanceCard
-              title="Total Products in Catalog"
-              value={totalProducts.toLocaleString("en-PK")}
-              href="/inventory"
-              tooltip="Total number of active product items registered in your store catalog."
-            />
           </section>
 
           {/* Recent Sales (Collapsible, closed by default) */}
@@ -498,37 +509,6 @@ function StatCard({
     );
   }
   return content;
-}
-
-function BalanceCard({
-  title,
-  value,
-  href,
-  tooltip,
-}: {
-  title: string;
-  value: string;
-  href: string;
-  tooltip?: string;
-}) {
-  return (
-    <div className="pos-panel rounded-xl p-4 hover:bg-foreground/5 transition block">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <p className="text-sm text-muted-foreground">{title}</p>
-          {tooltip && <InfoTooltip text={tooltip} title={title} side="top" />}
-        </div>
-      </div>
-      <p className="text-2xl font-bold mt-2">{value}</p>
-      <Link
-        href={href}
-        prefetch={true}
-        className="text-xs text-[var(--pos-brand)] mt-2 inline-block hover:underline"
-      >
-        View details →
-      </Link>
-    </div>
-  );
 }
 
 function QuickAction({

@@ -65,6 +65,8 @@ export async function GET() {
     const reconciledList: {
       product_id: string;
       quantity: number;
+      total_purchased?: number;
+      total_sold?: number;
       updated_at: string;
       pos_products: { name: string; unit: string };
     }[] = [];
@@ -99,6 +101,8 @@ export async function GET() {
       reconciledList.push({
         product_id: prod.id,
         quantity: trueStock,
+        total_purchased: totalPurchased,
+        total_sold: totalSold,
         updated_at: existing?.updated_at || nowIso,
         pos_products: {
           name: prod.name,

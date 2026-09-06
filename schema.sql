@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS pos_purchases (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   supplier_id       UUID NOT NULL REFERENCES pos_suppliers(id) ON DELETE RESTRICT,
   purchase_date     DATE NOT NULL DEFAULT CURRENT_DATE,
+  purchase_date     DATE NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Karachi')::DATE,
   reference_number  TEXT,
   notes             TEXT,
   total_amount      NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (total_amount >= 0),
@@ -113,6 +114,7 @@ CREATE TABLE IF NOT EXISTS pos_supplier_payments (
   purchase_id     UUID REFERENCES pos_purchases(id) ON DELETE SET NULL,
   amount          NUMERIC(12,2) NOT NULL CHECK (amount > 0),
   payment_date    DATE NOT NULL DEFAULT CURRENT_DATE,
+  payment_date    DATE NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Karachi')::DATE,
   payment_method  TEXT,
   notes           TEXT,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -122,12 +124,13 @@ CREATE TABLE IF NOT EXISTS pos_supplier_payments (
 -- SALES & ALLOCATIONS
 -- ----------------------------------------------------------------------------
 CREATE SEQUENCE IF NOT EXISTS pos_receipt_number_seq;
+CREATE SEQUENCE IF NOT EXISTS pos_receipt_number_seq MINVALUE 0 START WITH 0;
 
 CREATE TABLE IF NOT EXISTS pos_sales (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id       UUID REFERENCES pos_customers(id) ON DELETE RESTRICT,
   receipt_number    TEXT NOT NULL DEFAULT ('PT-' || LPAD(nextval('pos_receipt_number_seq')::TEXT, 4, '0')),
-  sale_date         DATE NOT NULL DEFAULT CURRENT_DATE,
+  sale_date         DATE NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Karachi')::DATE,
   notes             TEXT,
   total_amount      NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (total_amount >= 0),
   amount_paid       NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (amount_paid >= 0),
@@ -169,6 +172,7 @@ CREATE TABLE IF NOT EXISTS pos_customer_payments (
   sale_id         UUID REFERENCES pos_sales(id) ON DELETE SET NULL,
   amount          NUMERIC(12,2) NOT NULL CHECK (amount > 0),
   payment_date    DATE NOT NULL DEFAULT CURRENT_DATE,
+  payment_date    DATE NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Karachi')::DATE,
   payment_method  TEXT,
   notes           TEXT,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -401,6 +405,9 @@ AS $$
 DECLARE
   v_purchase_id UUID;
   v_item        JSONB;
+  v_purchase_id     UUID;
+  v_item            JSONB;
+  v_effective_date  DATE;
 BEGIN
   IF p_supplier_id IS NULL THEN
     RAISE EXCEPTION 'supplier_id is required';
@@ -410,10 +417,13 @@ BEGIN
     RAISE EXCEPTION 'At least one purchase item is required';
   END IF;
 
+  v_effective_date := COALESCE(p_purchase_date, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Karachi')::DATE);
+
   INSERT INTO pos_purchases (supplier_id, purchase_date, reference_number, notes)
   VALUES (
     p_supplier_id,
     COALESCE(p_purchase_date, CURRENT_DATE),
+    v_effective_date,
     NULLIF(BTRIM(p_reference_number), ''),
     NULLIF(BTRIM(p_notes), '')
   )
@@ -441,6 +451,7 @@ BEGIN
       v_purchase_id,
       p_amount_paid,
       COALESCE(p_purchase_date, CURRENT_DATE),
+      v_effective_date,
       NULLIF(BTRIM(p_payment_method), '')
     );
   END IF;
@@ -451,32 +462,37 @@ $$;
 
 DROP FUNCTION IF EXISTS pos_create_sale(UUID, JSONB);
 DROP FUNCTION IF EXISTS pos_create_sale(UUID, JSONB, NUMERIC);
+DROP FUNCTION IF EXISTS pos_create_sale(UUID, JSONB, NUMERIC, DATE);
 
 CREATE OR REPLACE FUNCTION pos_create_sale(
   p_customer_id  UUID,
   p_items        JSONB,
-  p_paid_amount  NUMERIC DEFAULT 0
+  p_paid_amount  NUMERIC DEFAULT 0,
+  p_sale_date    DATE DEFAULT NULL
 ) RETURNS UUID
 LANGUAGE plpgsql
 AS $$
 DECLARE
-  v_sale_id       UUID;
-  v_sale_item_id  UUID;
-  v_product_id    UUID;
-  v_qty           NUMERIC(12,2);
-  v_unit_price    NUMERIC(12,2);
-  v_stock         NUMERIC(12,2);
-  v_remaining     NUMERIC(12,2);
-  v_take          NUMERIC(12,2);
-  v_cost_total    NUMERIC(18,4);
-  v_qty_total     NUMERIC(18,4);
-  v_purchase      RECORD;
-  v_total         NUMERIC(12,2);
-  v_paid          NUMERIC(12,2);
+  v_sale_id         UUID;
+  v_sale_item_id    UUID;
+  v_product_id      UUID;
+  v_qty             NUMERIC(12,2);
+  v_unit_price      NUMERIC(12,2);
+  v_stock           NUMERIC(12,2);
+  v_remaining       NUMERIC(12,2);
+  v_take            NUMERIC(12,2);
+  v_cost_total      NUMERIC(18,4);
+  v_qty_total       NUMERIC(18,4);
+  v_purchase        RECORD;
+  v_total           NUMERIC(12,2);
+  v_paid            NUMERIC(12,2);
+  v_effective_date  DATE;
 BEGIN
   IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items) < 1 THEN
     RAISE EXCEPTION 'At least one sale item is required';
   END IF;
+
+  v_effective_date := COALESCE(p_sale_date, (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Karachi')::DATE);
 
   v_paid := COALESCE(p_paid_amount, 0);
   IF v_paid < 0 THEN
@@ -539,7 +555,7 @@ BEGIN
   )
   VALUES (
     p_customer_id,
-    CURRENT_DATE,
+    v_effective_date,
     0,
     0,
     'credit'
@@ -701,7 +717,7 @@ BEGIN
       p_customer_id,
       v_sale_id,
       v_paid,
-      CURRENT_DATE,
+      v_effective_date,
       'cash'
     );
   ELSIF p_customer_id IS NULL AND v_paid = v_total THEN
@@ -715,6 +731,19 @@ BEGIN
   END IF;
 
   RETURN v_sale_id;
+END;
+$$;
+
+-- 3-parameter overload for backward compatibility with older clients/callers
+CREATE OR REPLACE FUNCTION pos_create_sale(
+  p_customer_id  UUID,
+  p_items        JSONB,
+  p_paid_amount  NUMERIC DEFAULT 0
+) RETURNS UUID
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN pos_create_sale(p_customer_id, p_items, p_paid_amount, NULL);
 END;
 $$;
 
@@ -822,3 +851,30 @@ CREATE INDEX IF NOT EXISTS idx_pos_customer_payments_date ON pos_customer_paymen
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, anon, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated, anon, service_role;
 GRANT ALL ON ALL ROUTINES IN SCHEMA public TO authenticated, anon, service_role;
+
+-- ----------------------------------------------------------------------------
+-- POSTGRES TIMEZONE & SAFE BACKFILL MIGRATION
+-- ----------------------------------------------------------------------------
+-- Ensure database default session timezone matches the shop's local timezone
+ALTER DATABASE postgres SET timezone TO 'Asia/Karachi';
+
+-- Reset receipt sequence so the next sale generates PT-0000
+ALTER SEQUENCE pos_receipt_number_seq MINVALUE 0 START WITH 0 RESTART WITH 0;
+
+-- Migration-safe backfill: strictly fixes rows where sale_date or purchase_date was recorded
+-- off by one day due to UTC midnight-5am evaluation, without altering correctly dated historical records.
+UPDATE pos_sales
+SET sale_date = (created_at AT TIME ZONE 'Asia/Karachi')::DATE
+WHERE sale_date <> (created_at AT TIME ZONE 'Asia/Karachi')::DATE;
+
+UPDATE pos_purchases
+SET purchase_date = (created_at AT TIME ZONE 'Asia/Karachi')::DATE
+WHERE purchase_date <> (created_at AT TIME ZONE 'Asia/Karachi')::DATE;
+
+UPDATE pos_customer_payments
+SET payment_date = (created_at AT TIME ZONE 'Asia/Karachi')::DATE
+WHERE payment_date <> (created_at AT TIME ZONE 'Asia/Karachi')::DATE;
+
+UPDATE pos_supplier_payments
+SET payment_date = (created_at AT TIME ZONE 'Asia/Karachi')::DATE
+WHERE payment_date <> (created_at AT TIME ZONE 'Asia/Karachi')::DATE;

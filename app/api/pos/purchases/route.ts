@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { getPakistanDate } from "@/lib/pos-date-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -88,13 +89,14 @@ export async function POST(request: Request) {
     const supabaseAdmin = getSupabaseAdmin();
 
     let purchaseId: string | null = null;
+    const effectivePurchaseDate = purchase_date || getPakistanDate();
 
     // Try 7-parameter RPC first (which matches the PostgreSQL function in schema.sql)
     const { data: rpc7Data, error: rpc7Error } = await supabaseAdmin.rpc(
       "pos_create_purchase",
       {
         p_supplier_id: supplier_id,
-        p_purchase_date: purchase_date || null,
+        p_purchase_date: effectivePurchaseDate,
         p_items: items.map((item: any) => ({
           product_id: item.product_id,
           quantity: Number(item.quantity),
@@ -117,7 +119,7 @@ export async function POST(request: Request) {
         "pos_create_purchase",
         {
           p_supplier_id: supplier_id,
-          p_purchase_date: purchase_date || null,
+          p_purchase_date: effectivePurchaseDate,
           p_items: items.map((item: any) => ({
             product_id: item.product_id,
             quantity: Number(item.quantity),

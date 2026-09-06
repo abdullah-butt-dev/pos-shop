@@ -474,12 +474,17 @@ export default function PayablesPage() {
                                           className="bg-foreground/5 rounded-xl p-4 grid gap-3 sm:grid-cols-3 items-end"
                                         >
                                           <div>
-                                            <label
-                                              htmlFor={`amount-${p.id}`}
-                                              className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2"
-                                            >
-                                              Amount (Rs)
-                                            </label>
+                                            <div className="flex items-center justify-between mb-2">
+                                              <label
+                                                htmlFor={`amount-${p.id}`}
+                                                className="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                                              >
+                                                Amount (Rs)
+                                              </label>
+                                              <span className="text-[11px] font-medium text-muted-foreground">
+                                                Due: {formatMoney(due)}
+                                              </span>
+                                            </div>
                                             <input
                                               id={`amount-${p.id}`}
                                               type="number"
@@ -490,19 +495,18 @@ export default function PayablesPage() {
                                               onChange={(e) =>
                                                 setPayAmount(e.target.value)
                                               }
-                                              className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition font-semibold"
+                                              className="w-full h-10 bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition font-semibold"
                                             />
-                                            <p className="text-[10px] text-muted-foreground mt-1">
-                                              Remaining: {formatMoney(due)}
-                                            </p>
                                           </div>
                                           <div>
-                                            <label
-                                              htmlFor={`date-${p.id}`}
-                                              className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2"
-                                            >
-                                              Payment Date
-                                            </label>
+                                            <div className="flex items-center justify-between mb-2">
+                                              <label
+                                                htmlFor={`date-${p.id}`}
+                                                className="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                                              >
+                                                Payment Date
+                                              </label>
+                                            </div>
                                             <input
                                               id={`date-${p.id}`}
                                               type="date"
@@ -510,27 +514,34 @@ export default function PayablesPage() {
                                               onChange={(e) =>
                                                 setPayDate(e.target.value)
                                               }
-                                              className="w-full bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
+                                              className="w-full h-10 bg-background border border-foreground/10 rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand transition"
                                             />
                                           </div>
-                                          <div className="flex gap-2 w-full">
-                                            <button
-                                              type="submit"
-                                              disabled={submitting}
-                                              className="flex-1 px-3 py-2.5 rounded-xl bg-pos-brand text-black text-xs font-bold transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                                            >
-                                              {submitting && (
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                              )}
-                                              Save Payment
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={closePaymentForm}
-                                              className="px-3 py-2.5 rounded-xl bg-foreground/10 text-xs font-semibold transition active:scale-[0.98]"
-                                            >
-                                              Cancel
-                                            </button>
+                                          <div>
+                                            <div className="flex items-center justify-between mb-2 sm:invisible">
+                                              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                                Action
+                                              </span>
+                                            </div>
+                                            <div className="flex gap-2 w-full">
+                                              <button
+                                                type="submit"
+                                                disabled={submitting}
+                                                className="flex-1 h-10 px-3 rounded-xl bg-pos-brand text-black text-xs font-bold transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                                              >
+                                                {submitting && (
+                                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                )}
+                                                Save Payment
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={closePaymentForm}
+                                                className="h-10 px-3.5 rounded-xl bg-foreground/10 text-xs font-semibold transition active:scale-[0.98]"
+                                              >
+                                                Cancel
+                                              </button>
+                                            </div>
                                           </div>
                                         </form>
                                       </td>

@@ -21,6 +21,7 @@ type PosProduct = {
   name: string;
   unit: string;
   stock: number;
+  totalSold?: number;
 };
 
 function MobileCartButton({ onOpen }: { onOpen: () => void }) {
@@ -60,6 +61,9 @@ function OrdersContent({
   refreshing?: boolean;
 }) {
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [expandedProductId, setExpandedProductId] = useState<string | null>(
+    null,
+  );
 
   return (
     <main className="h-full w-full flex flex-col overflow-hidden bg-[var(--pos-panel-2)] text-foreground">
@@ -137,14 +141,21 @@ function OrdersContent({
                 </Link>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 pb-2 pr-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 pb-2 pr-2 items-start">
                 {filteredProducts.map((product) => (
                   <ProductCard
                     key={product.id}
                     id={product.id}
                     name={product.name}
                     stock={product.stock}
+                    totalSold={product.totalSold}
                     purchaseHistory={purchaseHistoryMap[product.id] || []}
+                    isExpanded={expandedProductId === product.id}
+                    onToggleExpand={() =>
+                      setExpandedProductId((prev) =>
+                        prev === product.id ? null : product.id,
+                      )
+                    }
                   />
                 ))}
               </div>
@@ -230,6 +241,7 @@ export default function OrdersPage() {
         {
           quantity: number;
           unit: string;
+          totalSold: number;
         }
       >();
 
@@ -237,6 +249,7 @@ export default function OrdersPage() {
         inventoryMap.set(row.product_id, {
           quantity: Number(row.quantity) || 0,
           unit: row.pos_products?.unit || "unit",
+          totalSold: Number(row.total_sold) || 0,
         });
       }
 
@@ -249,6 +262,7 @@ export default function OrdersPage() {
             name: product.name,
             unit: inventory?.unit || "unit",
             stock: inventory?.quantity || 0,
+            totalSold: inventory?.totalSold || 0,
           };
         },
       );

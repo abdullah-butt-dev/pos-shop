@@ -21,21 +21,49 @@ export function ProductCard({
   stock = 0,
   highlight,
   purchaseHistory = [],
+  totalSold,
+  isExpanded,
+  onToggleExpand,
 }: {
   id: string;
   name: string;
   stock?: number;
   highlight?: "tile-pink" | "tile-blue" | "tile-purple";
   purchaseHistory?: PurchaseHistoryEntry[];
+  totalSold?: number;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }) {
   const { items, inc, dec, add, setQty } = useCart();
-  const [showHistory, setShowHistory] = useState(false);
+  const [internalShowHistory, setInternalShowHistory] = useState(false);
+  const showHistory =
+    isExpanded !== undefined ? isExpanded : internalShowHistory;
+  const toggleHistory = () => {
+    if (onToggleExpand) {
+      onToggleExpand();
+    } else {
+      setInternalShowHistory((prev) => !prev);
+    }
+  };
+
+  const totalPurchased = purchaseHistory.reduce(
+    (sum, e) => sum + (Number(e.totalQuantity) || 0),
+    0,
+  );
+
+  // Guard against stale cache where stock reads 0 despite active purchases with 0 sales
+  const effectiveStock =
+    stock > 0
+      ? stock
+      : (totalSold ?? 0) === 0 && totalPurchased > 0
+        ? totalPurchased
+        : stock;
 
   const item = items.find((i) => i.id === id);
   const qty = item?.qty ?? 0;
 
-  const isOutOfStock = stock <= 0;
-  const isStockLimitReached = qty >= stock;
+  const isOutOfStock = effectiveStock <= 0;
+  const isStockLimitReached = qty >= effectiveStock;
 
   const handleCardClick = () => {
     if (isOutOfStock || isStockLimitReached) return;
@@ -66,12 +94,12 @@ export function ProductCard({
 
     if (val <= 0) {
       setQty(id, 0);
-    } else if (val > stock) {
+    } else if (val > effectiveStock) {
       if (qty === 0) {
         add({ id, name, price: 0 });
       }
-      setQty(id, stock);
-      toast.warning(`Maximum available stock is ${stock}`);
+      setQty(id, effectiveStock);
+      toast.warning(`Maximum available stock is ${effectiveStock}`);
     } else {
       if (qty === 0) {
         add({ id, name, price: 0 });
@@ -84,7 +112,7 @@ export function ProductCard({
     <div
       onClick={handleCardClick}
       className={cn(
-        "group relative rounded-xl border border-[var(--pos-stroke)] bg-[var(--pos-panel)] p-3 sm:p-3.5 transition-all duration-200 cursor-pointer hover:border-foreground/20 hover:shadow-sm flex flex-col justify-between gap-2.5",
+        "group relative self-start w-full rounded-xl border border-[var(--pos-stroke)] bg-[var(--pos-panel)] p-3 sm:p-3.5 transition-all duration-200 cursor-pointer hover:border-foreground/20 hover:shadow-sm flex flex-col justify-between gap-2.5",
         highlight,
         isOutOfStock &&
           "opacity-60 saturate-50 border-red-500/20 dark:border-red-900/50 cursor-not-allowed",
@@ -104,7 +132,7 @@ export function ProductCard({
               aria-label={`View purchase history for ${name}`}
               onClick={(e) => {
                 e.stopPropagation();
-                setShowHistory((prev) => !prev);
+                toggleHistory();
               }}
               className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium rounded-md bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition cursor-pointer"
               title="View purchase history"
@@ -126,7 +154,7 @@ export function ProductCard({
                 isOutOfStock ? "text-red-500" : "text-muted-foreground",
               )}
             >
-              Stock: {stock}
+              Stock: {effectiveStock}
             </span>
 
             {isOutOfStock && (
@@ -158,7 +186,7 @@ export function ProductCard({
           <input
             type="number"
             min="0"
-            max={stock}
+            max={effectiveStock}
             value={qty > 0 ? qty : ""}
             placeholder="0"
             onChange={handleQuantityInputChange}
@@ -200,19 +228,19 @@ export function ProductCard({
           <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
             <span>Purchase Breakdown</span>
             <span className="font-bold text-foreground">
-              Current Stock: {stock}
+              Current Stock: {effectiveStock}
             </span>
           </div>
 
           {purchaseHistory && purchaseHistory.length > 0 ? (
             <>
               {(() => {
-                const totalPurchased = purchaseHistory.reduce(
-                  (sum, e) => sum + (Number(e.totalQuantity) || 0),
-                  0,
-                );
+                const soldCount =
+                  totalSold !== undefined
+                    ? totalSold
+                    : Math.max(0, totalPurchased - effectiveStock);
                 return (
-                  totalPurchased > stock && (
+                  totalPurchased > 0 && (
                     <div className="text-[11px] px-2 py-1 rounded bg-muted/40 text-muted-foreground flex items-center justify-between">
                       <span>
                         Total Purchased:{" "}
@@ -220,12 +248,14 @@ export function ProductCard({
                           {totalPurchased}
                         </strong>
                       </span>
-                      <span>
-                        Sold:{" "}
-                        <strong className="text-foreground">
-                          {totalPurchased - stock}
-                        </strong>
-                      </span>
+                      {soldCount > 0 && (
+                        <span>
+                          Sold:{" "}
+                          <strong className="text-foreground">
+                            {soldCount}
+                          </strong>
+                        </span>
+                      )}
                     </div>
                   )
                 );
