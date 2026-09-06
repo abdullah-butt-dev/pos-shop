@@ -68,7 +68,6 @@ CREATE TABLE IF NOT EXISTS pos_customers (
 CREATE TABLE IF NOT EXISTS pos_purchases (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   supplier_id       UUID NOT NULL REFERENCES pos_suppliers(id) ON DELETE RESTRICT,
-  purchase_date     DATE NOT NULL DEFAULT CURRENT_DATE,
   purchase_date     DATE NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Karachi')::DATE,
   reference_number  TEXT,
   notes             TEXT,
@@ -113,7 +112,6 @@ CREATE TABLE IF NOT EXISTS pos_supplier_payments (
   supplier_id     UUID NOT NULL REFERENCES pos_suppliers(id) ON DELETE RESTRICT,
   purchase_id     UUID REFERENCES pos_purchases(id) ON DELETE SET NULL,
   amount          NUMERIC(12,2) NOT NULL CHECK (amount > 0),
-  payment_date    DATE NOT NULL DEFAULT CURRENT_DATE,
   payment_date    DATE NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Karachi')::DATE,
   payment_method  TEXT,
   notes           TEXT,
@@ -123,7 +121,6 @@ CREATE TABLE IF NOT EXISTS pos_supplier_payments (
 -- ----------------------------------------------------------------------------
 -- SALES & ALLOCATIONS
 -- ----------------------------------------------------------------------------
-CREATE SEQUENCE IF NOT EXISTS pos_receipt_number_seq;
 CREATE SEQUENCE IF NOT EXISTS pos_receipt_number_seq MINVALUE 0 START WITH 0;
 
 CREATE TABLE IF NOT EXISTS pos_sales (
