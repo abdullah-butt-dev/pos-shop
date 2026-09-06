@@ -33,7 +33,38 @@ async function clearTestData() {
   console.log('🚀 Starting POS test data cleanup...');
   console.log('🔒 Note: auth.users (passwords/usernames) and pos_business_settings are PRESERVED.\n');
 
-  // Step 1: Ensure pos_inventory has high buffer stock so purchase item delete triggers do not violate non-negative constraint
+  // Step 1: Delete sales-related tables
+  const { error: scaErr, count: scaCount } = await supabase
+    .from('pos_sale_cost_allocations')
+    .delete({ count: 'exact' })
+    .neq('id', '00000000-0000-0000-0000-000000000000');
+  console.log(`pos_sale_cost_allocations: ${scaErr ? '❌ ' + scaErr.message : '✅ Cleared ' + (scaCount ?? 0) + ' rows'}`);
+
+  const { error: siErr, count: siCount } = await supabase
+    .from('pos_sale_items')
+    .delete({ count: 'exact' })
+    .neq('id', '00000000-0000-0000-0000-000000000000');
+  console.log(`pos_sale_items: ${siErr ? '❌ ' + siErr.message : '✅ Cleared ' + (siCount ?? 0) + ' rows'}`);
+
+  const { error: cpErr, count: cpCount } = await supabase
+    .from('pos_customer_payments')
+    .delete({ count: 'exact' })
+    .neq('id', '00000000-0000-0000-0000-000000000000');
+  console.log(`pos_customer_payments: ${cpErr ? '❌ ' + cpErr.message : '✅ Cleared ' + (cpCount ?? 0) + ' rows'}`);
+
+  const { error: sErr, count: sCount } = await supabase
+    .from('pos_sales')
+    .delete({ count: 'exact' })
+    .neq('id', '00000000-0000-0000-0000-000000000000');
+  console.log(`pos_sales: ${sErr ? '❌ ' + sErr.message : '✅ Cleared ' + (sCount ?? 0) + ' rows'}`);
+
+  const { error: spErr, count: spCount } = await supabase
+    .from('pos_supplier_payments')
+    .delete({ count: 'exact' })
+    .neq('id', '00000000-0000-0000-0000-000000000000');
+  console.log(`pos_supplier_payments: ${spErr ? '❌ ' + spErr.message : '✅ Cleared ' + (spCount ?? 0) + ' rows'}`);
+
+  // Step 2: Buffer inventory before deleting purchase items so triggers do not violate non-negative check
   const { data: products } = await supabase.from('pos_products').select('id');
   if (products && products.length > 0) {
     for (const p of products) {
@@ -41,47 +72,51 @@ async function clearTestData() {
     }
   }
 
-  // Step 2: Delete purchase items
+  // Step 3: Delete purchase items
   const { error: piErr, count: piCount } = await supabase
     .from('pos_purchase_items')
     .delete({ count: 'exact' })
     .neq('id', '00000000-0000-0000-0000-000000000000');
-  console.log(`pos_purchase_items: ${piErr ? '❌ ' + piErr.message : '✅ Cleared ' + piCount + ' rows'}`);
+  console.log(`pos_purchase_items: ${piErr ? '❌ ' + piErr.message : '✅ Cleared ' + (piCount ?? 0) + ' rows'}`);
 
-  // Step 3: Delete purchases
+  // Step 4: Delete purchases
   const { error: purErr, count: purCount } = await supabase
     .from('pos_purchases')
     .delete({ count: 'exact' })
     .neq('id', '00000000-0000-0000-0000-000000000000');
-  console.log(`pos_purchases: ${purErr ? '❌ ' + purErr.message : '✅ Cleared ' + purCount + ' rows'}`);
+  console.log(`pos_purchases: ${purErr ? '❌ ' + purErr.message : '✅ Cleared ' + (purCount ?? 0) + ' rows'}`);
 
-  // Step 4: Delete inventory movements
+  // Step 5: Delete inventory movements & inventory
   const { error: imErr, count: imCount } = await supabase
     .from('pos_inventory_movements')
     .delete({ count: 'exact' })
     .neq('id', '00000000-0000-0000-0000-000000000000');
-  console.log(`pos_inventory_movements: ${imErr ? '❌ ' + imErr.message : '✅ Cleared ' + imCount + ' rows'}`);
+  console.log(`pos_inventory_movements: ${imErr ? '❌ ' + imErr.message : '✅ Cleared ' + (imCount ?? 0) + ' rows'}`);
 
-  // Step 5: Delete inventory
   const { error: invErr, count: invCount } = await supabase
     .from('pos_inventory')
     .delete({ count: 'exact' })
     .neq('product_id', '00000000-0000-0000-0000-000000000000');
-  console.log(`pos_inventory: ${invErr ? '❌ ' + invErr.message : '✅ Cleared ' + invCount + ' rows'}`);
+  console.log(`pos_inventory: ${invErr ? '❌ ' + invErr.message : '✅ Cleared ' + (invCount ?? 0) + ' rows'}`);
 
-  // Step 6: Delete products
+  // Step 6: Delete customers, products, and suppliers
+  const { error: cErr, count: cCount } = await supabase
+    .from('pos_customers')
+    .delete({ count: 'exact' })
+    .neq('id', '00000000-0000-0000-0000-000000000000');
+  console.log(`pos_customers: ${cErr ? '❌ ' + cErr.message : '✅ Cleared ' + (cCount ?? 0) + ' rows'}`);
+
   const { error: prodErr, count: prodCount } = await supabase
     .from('pos_products')
     .delete({ count: 'exact' })
     .neq('id', '00000000-0000-0000-0000-000000000000');
-  console.log(`pos_products: ${prodErr ? '❌ ' + prodErr.message : '✅ Cleared ' + prodCount + ' rows'}`);
+  console.log(`pos_products: ${prodErr ? '❌ ' + prodErr.message : '✅ Cleared ' + (prodCount ?? 0) + ' rows'}`);
 
-  // Step 7: Delete suppliers
   const { error: supErr, count: supCount } = await supabase
     .from('pos_suppliers')
     .delete({ count: 'exact' })
     .neq('id', '00000000-0000-0000-0000-000000000000');
-  console.log(`pos_suppliers: ${supErr ? '❌ ' + supErr.message : '✅ Cleared ' + supCount + ' rows'}`);
+  console.log(`pos_suppliers: ${supErr ? '❌ ' + supErr.message : '✅ Cleared ' + (supCount ?? 0) + ' rows'}`);
 
   // Final check of counts across all tables
   const tables = [
