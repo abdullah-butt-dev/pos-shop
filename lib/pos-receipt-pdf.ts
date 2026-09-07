@@ -147,7 +147,15 @@ function drawReceipt(doc: jsPDF, receipt: PosReceiptData): number {
   const colPrice = MARGIN + 34;
   const colQty = MARGIN + 46;
   const colTotal = WIDTH - MARGIN;
-  const nameWrapWidth = 28;
+
+  // The price column text is right-aligned at colPrice (39mm), extending leftward by
+  // up to ~14-16mm for prices like "Rs1,250.00". To prevent item names from colliding
+  // into the price digits, nameWrapWidth is calculated as the column gap minus the
+  // expected price text width and a safety margin.
+  const colGap = colPrice - colName; // 34mm
+  const maxPriceTextWidth = 14; // Expected width of price text at font size 9 (~13.5mm for "Rs999.00")
+  const priceSafetyMargin = 4; // Safety gap ensuring text never crosses into the Price column
+  const nameWrapWidth = colGap - maxPriceTextWidth - priceSafetyMargin; // 16mm
 
   doc.setFillColor(236, 236, 236);
   doc.rect(MARGIN - 1, y - 3.6, CONTENT_WIDTH + 2, 6, "F");
