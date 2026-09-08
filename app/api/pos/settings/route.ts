@@ -118,10 +118,16 @@ export async function PUT(request: Request) {
       .select("*")
       .single();
 
-    // If column doesn't exist yet in Supabase, retry update without receipt_footer_text
-    if (error && error.code === "42703" && "receipt_footer_text" in updates) {
+    // If column doesn't exist yet in Supabase or PostgREST schema cache is stale, retry update without receipt_footer_text
+    if (
+      error &&
+      (error.code === "42703" ||
+        error.code === "PGRST204" ||
+        error.message?.includes("receipt_footer_text")) &&
+      "receipt_footer_text" in updates
+    ) {
       console.warn(
-        "[API /api/pos/settings] receipt_footer_text column not yet migrated in database, falling back without column",
+        "[API /api/pos/settings] receipt_footer_text column not yet migrated or schema cache stale in database, falling back without column",
       );
       const safeUpdates = { ...updates };
       delete safeUpdates.receipt_footer_text;

@@ -158,13 +158,27 @@ function drawReceipt(
   doc.setTextColor(90, 90, 90);
 
   if (receipt.shopAddress) {
-    doc.text(receipt.shopAddress, WIDTH / 2, y, { align: "center" });
-    y += 4;
+    const addressLines = doc.splitTextToSize(
+      receipt.shopAddress,
+      CONTENT_WIDTH,
+    );
+    const lines = Array.isArray(addressLines) ? addressLines : [addressLines];
+    for (const line of lines) {
+      doc.text(line, WIDTH / 2, y, { align: "center" });
+      y += 3.8;
+    }
   }
 
   if (receipt.shopPhone) {
-    doc.text(`Phone: ${receipt.shopPhone}`, WIDTH / 2, y, { align: "center" });
-    y += 4;
+    const phoneText = receipt.shopPhone.startsWith("Phone:")
+      ? receipt.shopPhone
+      : `Phone: ${receipt.shopPhone}`;
+    const phoneLines = doc.splitTextToSize(phoneText, CONTENT_WIDTH);
+    const lines = Array.isArray(phoneLines) ? phoneLines : [phoneLines];
+    for (const line of lines) {
+      doc.text(line, WIDTH / 2, y, { align: "center" });
+      y += 3.8;
+    }
   }
 
   doc.setTextColor(0, 0, 0);
