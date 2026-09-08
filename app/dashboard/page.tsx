@@ -230,10 +230,10 @@ export default function DashboardPage() {
     );
   };
 
-  const downloadReceipt = (sale: any) => {
+  const downloadReceipt = async (sale: any) => {
     const items = sale.pos_sale_items || [];
 
-    downloadPosReceiptPDF({
+    await downloadPosReceiptPDF({
       shopName: data?.settings?.shop_name || "Perfect Traders",
       shopAddress: data?.settings?.address || "Suraj Miani Road, Multan",
       shopPhone: data?.settings?.phone || "03134640267",

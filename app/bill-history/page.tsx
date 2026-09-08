@@ -80,10 +80,10 @@ export default function BillHistoryPage() {
     );
   }, [sales, query]);
 
-  const download = (sale: any) => {
+  const download = async (sale: any) => {
     const items = sale.pos_sale_items || [];
 
-    downloadPosReceiptPDF({
+    await downloadPosReceiptPDF({
       shopName: settings?.shop_name || "Perfect Traders",
 
       shopAddress: settings?.address || "Suraj Miani Road, Multan",

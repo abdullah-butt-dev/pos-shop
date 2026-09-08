@@ -164,16 +164,6 @@ export function OrderSummary({
   };
 
   const executeSaveSale = async () => {
-    // 1. Synchronously initiate user gesture action before any await to avoid popup blockers
-    const popupWindow = window.open("", "_blank");
-    if (popupWindow) {
-      try {
-        popupWindow.document.write(
-          "<!DOCTYPE html><html><head><title>Receipt</title></head><body style='font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#666;'><p>Generating receipt...</p></body></html>",
-        );
-      } catch {}
-    }
-
     setIsConfirmOpen(false);
     setSaving(true);
 
@@ -222,10 +212,9 @@ export function OrderSummary({
       };
 
       try {
-        downloadPosReceiptPDF(receiptData, popupWindow);
+        await downloadPosReceiptPDF(receiptData);
       } catch (pdfErr) {
         console.error("PDF receipt generation error:", pdfErr);
-        if (popupWindow) popupWindow.close();
         toast.error("Failed to generate receipt PDF");
       }
 
@@ -242,7 +231,6 @@ export function OrderSummary({
       window.setTimeout(() => setSuccess(false), 1500);
     } catch (error) {
       console.error("Failed to save sale:", error);
-      if (popupWindow) popupWindow.close();
 
       toast.error(
         error instanceof Error ? error.message : "Failed to save sale",

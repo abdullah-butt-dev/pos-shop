@@ -58,23 +58,35 @@ interface RenderedFooterImage {
   heightMm: number;
 }
 
+let urduFontPromise: Promise<void> | null = null;
+
 export async function ensureUrduFont(): Promise<void> {
   if (typeof document === "undefined" || !("fonts" in document)) return;
 
   try {
     if (document.fonts.check('16px "Noto Naskh Arabic"')) return;
-
-    const font = new FontFace(
-      "Noto Naskh Arabic",
-      "url(/fonts/NotoNaskhArabic-Regular.woff2)",
-      { style: "normal", weight: "400" },
-    );
-    const loaded = await font.load();
-    document.fonts.add(loaded);
-    await document.fonts.ready;
-  } catch (err) {
-    console.warn("Noto Naskh Arabic font preloading error:", err);
+  } catch {
+    // fonts.check may fail in some environments; continue to load
   }
+
+  if (urduFontPromise) return urduFontPromise;
+
+  urduFontPromise = (async () => {
+    try {
+      const font = new FontFace(
+        "Noto Naskh Arabic",
+        "url(/fonts/NotoNaskhArabic-Regular.woff2)",
+        { style: "normal", weight: "400" },
+      );
+      const loaded = await font.load();
+      document.fonts.add(loaded);
+      await document.fonts.ready;
+    } catch (err) {
+      console.warn("Noto Naskh Arabic font preloading error:", err);
+    }
+  })();
+
+  return urduFontPromise;
 }
 
 function renderUrduFooterCanvas(
@@ -360,24 +372,23 @@ export function buildPosReceiptDoc(receipt: PosReceiptData): jsPDF {
   return doc;
 }
 
-export function downloadPosReceiptPDF(
+export async function downloadPosReceiptPDF(
   receipt: PosReceiptData,
-  targetWindow?: Window | null,
-): jsPDF {
+): Promise<jsPDF> {
+  await ensureUrduFont();
   const doc = buildPosReceiptDoc(receipt);
   const fileName = `${receipt.receiptNumber || "receipt"}.pdf`;
+
+  // Always save first via native browser download (reliable on desktop & mobile)
   doc.save(fileName);
 
+  // Best-effort attempt to open for viewing; quietly ignored if blocked
   if (typeof window !== "undefined") {
-    const blobUrl = String(doc.output("bloburl"));
-    if (targetWindow && !targetWindow.closed) {
-      try {
-        targetWindow.location.href = blobUrl;
-      } catch {
-        window.open(blobUrl, "_blank");
-      }
-    } else {
+    try {
+      const blobUrl = String(doc.output("bloburl"));
       window.open(blobUrl, "_blank");
+    } catch {
+      // Popup blocked or not supported; safe since file is already saved
     }
   }
 
