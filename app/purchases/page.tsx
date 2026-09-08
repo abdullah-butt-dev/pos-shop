@@ -4,6 +4,7 @@ import type React from "react";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   Loader2,
   PackageCheck,
   Plus,
@@ -21,6 +22,16 @@ import {
 } from "@/components/purchases/autocomplete-field";
 import { InfoTooltip } from "@/components/pos/info-tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   PosInventoryService,
   PosProductService,
@@ -77,6 +88,14 @@ export default function PurchasesPage() {
   const [purchases, setPurchases] = useState<PosPurchaseWithRelations[]>([]);
   const [purchasesLoading, setPurchasesLoading] = useState(true);
   const [inventory, setInventory] = useState<PosInventoryRow[]>([]);
+
+  const [deleteTargetPurchase, setDeleteTargetPurchase] =
+    useState<PosPurchaseWithRelations | null>(null);
+  const [isDeletePurchaseOpen, setIsDeletePurchaseOpen] = useState(false);
+  const [deletePurchaseLoading, setDeletePurchaseLoading] = useState(false);
+  const [deleteBlockingError, setDeleteBlockingError] = useState<string | null>(
+    null,
+  );
 
   const loadPurchases = useCallback(async () => {
     setPurchasesLoading(true);
@@ -247,6 +266,26 @@ export default function PurchasesPage() {
     }
   }
 
+  async function handleDeletePurchase() {
+    if (!deleteTargetPurchase) return;
+    setDeletePurchaseLoading(true);
+    setDeleteBlockingError(null);
+    try {
+      await PosPurchaseService.delete(deleteTargetPurchase.id);
+      toast.success("Purchase deleted and stock updated");
+      setIsDeletePurchaseOpen(false);
+      setDeleteTargetPurchase(null);
+      await loadPurchases();
+      await loadInventory();
+    } catch (err: any) {
+      const msg = err?.message || "Failed to delete purchase";
+      setDeleteBlockingError(msg);
+      toast.error(msg);
+    } finally {
+      setDeletePurchaseLoading(false);
+    }
+  }
+
   return (
     <main className="h-full w-full flex flex-col overflow-hidden bg-[var(--pos-panel-2)] text-foreground">
       <NavHeader />
@@ -302,13 +341,14 @@ export default function PurchasesPage() {
                           <th className="py-2 pr-3 text-right">Paid</th>
                           <th className="py-2 pr-3 text-right">Due</th>
                           <th className="py-2 text-right">Status</th>
+                          <th className="py-2 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {purchases.map((p) => (
                           <tr
                             key={p.id}
-                            className="border-b border-[var(--pos-stroke)]/50 align-top"
+                            className="border-b border-[var(--pos-stroke)]/50 align-top hover:bg-foreground/[0.01] transition-colors"
                           >
                             <td className="py-2 pr-3 whitespace-nowrap">
                               {p.purchase_date}
@@ -372,6 +412,20 @@ export default function PurchasesPage() {
                               >
                                 {p.payment_status}
                               </span>
+                            </td>
+                            <td className="py-2 text-right whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeleteTargetPurchase(p);
+                                  setDeleteBlockingError(null);
+                                  setIsDeletePurchaseOpen(true);
+                                }}
+                                className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 transition"
+                                title="Delete purchase"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -699,6 +753,106 @@ export default function PurchasesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {deleteTargetPurchase && (
+        <AlertDialog
+          open={isDeletePurchaseOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setIsDeletePurchaseOpen(false);
+              setDeleteBlockingError(null);
+            }
+          }}
+        >
+          <AlertDialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+            <AlertDialogHeader>
+              <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                <AlertTriangle className="w-5 h-5" />
+                <AlertDialogTitle className="text-lg">
+                  Delete Purchase?
+                </AlertDialogTitle>
+              </div>
+              <AlertDialogDescription>
+                This will delete the purchase from supplier{" "}
+                <span className="font-semibold text-foreground">
+                  {deleteTargetPurchase.pos_suppliers?.name || "Supplier"}
+                </span>{" "}
+                dated {deleteTargetPurchase.purchase_date}, reverse any supplier
+                payments, and deduct the purchased items from inventory.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            {deleteBlockingError && (
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs flex gap-2.5 items-start">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+                <div className="space-y-1">
+                  <p className="font-bold">Cannot delete this purchase</p>
+                  <p className="leading-relaxed">{deleteBlockingError}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2 text-xs p-3 rounded-xl bg-foreground/5 border border-[var(--pos-stroke)]">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Purchase:</span>
+                <span className="font-bold">
+                  {formatMoney(
+                    Number(deleteTargetPurchase.total_amount) || 0,
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Amount Paid:</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  {formatMoney(Number(deleteTargetPurchase.amount_paid) || 0)}
+                </span>
+              </div>
+              <div className="pt-2 border-t border-[var(--pos-stroke)]">
+                <span className="text-muted-foreground block mb-1">
+                  Items to deduct from inventory:
+                </span>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {deleteTargetPurchase.pos_purchase_items.map((it) => (
+                    <div
+                      key={it.id}
+                      className="flex justify-between text-muted-foreground"
+                    >
+                      <span>{it.pos_products?.name || "Product"}</span>
+                      <span className="font-semibold text-red-500">
+                        -{it.quantity} units
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <AlertDialogFooter className="gap-2 sm:gap-0">
+              <AlertDialogCancel disabled={deletePurchaseLoading}>
+                Cancel
+              </AlertDialogCancel>
+              <Button
+                type="button"
+                disabled={deletePurchaseLoading}
+                onClick={handleDeletePurchase}
+                className="bg-red-600 hover:bg-red-700 text-white font-semibold gap-1.5"
+              >
+                {deletePurchaseLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Yes, delete purchase
+                  </>
+                )}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </main>
   );

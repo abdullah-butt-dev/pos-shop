@@ -346,6 +346,19 @@ export class PosPurchaseService {
     }
     return json.data;
   }
+
+  static async delete(id: string): Promise<any> {
+    const res = await fetch(`/api/pos/purchases/${id}`, {
+      method: "DELETE",
+    });
+
+    const json = await res.json();
+    if (!res.ok || json.error) {
+      const msg = json.error || "Failed to delete purchase";
+      throw new Error(msg);
+    }
+    return json.data;
+  }
 }
 
 export interface PosInventoryRow extends PosInventory {
@@ -589,6 +602,32 @@ export class PosSaleService {
 
       throw error instanceof Error ? error : new Error("Failed to create sale");
     }
+  }
+
+  static async delete(id: string): Promise<any> {
+    const res = await fetch(`/api/pos/sales/${id}`, {
+      method: "DELETE",
+    });
+
+    const json = await res.json();
+    if (!res.ok || json?.error) {
+      throw new Error(json?.error || `Failed to delete sale (${res.status})`);
+    }
+    return json.data;
+  }
+
+  static async deleteBulk(ids: string[]): Promise<any> {
+    const res = await fetch("/api/pos/sales/bulk-delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sale_ids: ids }),
+    });
+
+    const json = await res.json();
+    if (!res.ok || json?.error) {
+      throw new Error(json?.error || `Failed to delete sales (${res.status})`);
+    }
+    return json.data;
   }
 }
 
