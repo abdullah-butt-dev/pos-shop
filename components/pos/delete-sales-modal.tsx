@@ -41,9 +41,7 @@ export function DeleteSalesModal({
       (sum, s) => sum + (Number(s.amount_paid) || 0),
       0,
     );
-    const paymentsCount = sales.filter(
-      (s) => Number(s.amount_paid) > 0,
-    ).length;
+    const paymentsCount = sales.filter((s) => Number(s.amount_paid) > 0).length;
 
     const stockMap = new Map<string, number>();
     for (const s of sales) {
@@ -79,9 +77,7 @@ export function DeleteSalesModal({
       } else {
         const ids = sales.map((s) => s.id);
         await PosSaleService.deleteBulk(ids);
-        toast.success(
-          `${sales.length} sales deleted and stock restored`,
-        );
+        toast.success(`${sales.length} sales deleted and stock restored`);
       }
       onOpenChange(false);
       onSuccess();

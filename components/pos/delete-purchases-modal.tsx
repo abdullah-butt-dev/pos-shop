@@ -51,8 +51,7 @@ export function DeletePurchasesModal({
         const unitCost = Number(item.unit_cost) || 0;
         totalCost += qty * unitCost;
 
-        const name =
-          item.pos_products?.name || item.product_name || "Product";
+        const name = item.pos_products?.name || item.product_name || "Product";
         stockMap.set(name, (stockMap.get(name) || 0) + qty);
       }
     }
@@ -108,11 +107,15 @@ export function DeletePurchasesModal({
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
             <AlertTriangle className="w-5 h-5" />
-            Delete {purchases.length > 1 ? `${purchases.length} Purchases` : "Purchase"}
+            Delete{" "}
+            {purchases.length > 1
+              ? `${purchases.length} Purchases`
+              : "Purchase"}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            This action deletes the purchase record(s), associated supplier payment
-            records, and reverses (subtracts) the purchased stock from inventory.
+            This action deletes the purchase record(s), associated supplier
+            payment records, and reverses (subtracts) the purchased stock from
+            inventory.
           </AlertDialogDescription>
         </AlertDialogHeader>
 

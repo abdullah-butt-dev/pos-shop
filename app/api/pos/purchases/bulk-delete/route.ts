@@ -43,7 +43,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, data });
   } catch (err: any) {
-    console.error("[API /api/pos/purchases/bulk-delete] Unexpected error:", err);
+    console.error(
+      "[API /api/pos/purchases/bulk-delete] Unexpected error:",
+      err,
+    );
     return NextResponse.json(
       { error: err?.message || "Internal server error" },
       { status: 500 },

@@ -170,15 +170,8 @@ function drawReceipt(
   }
 
   if (receipt.shopPhone) {
-    const phoneText = receipt.shopPhone.startsWith("Phone:")
-      ? receipt.shopPhone
-      : `Phone: ${receipt.shopPhone}`;
-    const phoneLines = doc.splitTextToSize(phoneText, CONTENT_WIDTH);
-    const lines = Array.isArray(phoneLines) ? phoneLines : [phoneLines];
-    for (const line of lines) {
-      doc.text(line, WIDTH / 2, y, { align: "center" });
-      y += 3.8;
-    }
+    doc.text(receipt.shopPhone, WIDTH / 2, y, { align: "center" });
+    y += 3.8;
   }
 
   doc.setTextColor(0, 0, 0);
@@ -431,14 +424,6 @@ export function printPosReceiptPDF(
   }
 
   return doc;
-}
-
-export async function generatePosReceiptPDF(
-  receipt: PosReceiptData,
-): Promise<void> {
-  await ensureUrduFont();
-  const doc = buildPosReceiptDoc(receipt);
-  doc.save(`${receipt.receiptNumber || "receipt"}.pdf`);
 }
 
 // Background preload Urdu font when loaded in browser

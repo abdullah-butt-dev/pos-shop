@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { DeleteSalesModal } from "@/components/pos/delete-sales-modal";
 import {
-  generatePosReceiptPDF,
+  downloadPosReceiptPDF,
   formatPakistanDateTime,
 } from "@/lib/pos-receipt-pdf";
 
@@ -83,7 +83,7 @@ export default function BillHistoryPage() {
   const download = (sale: any) => {
     const items = sale.pos_sale_items || [];
 
-    generatePosReceiptPDF({
+    downloadPosReceiptPDF({
       shopName: settings?.shop_name || "Perfect Traders",
 
       shopAddress: settings?.address || "Suraj Miani Road, Multan",

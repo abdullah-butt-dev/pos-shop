@@ -369,7 +369,9 @@ export class PosPurchaseService {
 
     const json = await res.json();
     if (!res.ok || json?.error) {
-      throw new Error(json?.error || `Failed to delete purchases (${res.status})`);
+      throw new Error(
+        json?.error || `Failed to delete purchases (${res.status})`,
+      );
     }
     return json.data;
   }

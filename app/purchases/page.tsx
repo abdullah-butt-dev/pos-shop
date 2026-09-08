@@ -321,156 +321,159 @@ export default function PurchasesPage() {
                 ) : (
                   <>
                     {selectedPurchaseIds.length > 0 && (
-                  <div className="flex items-center gap-2 p-2.5 mb-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs justify-between sm:justify-start animate-in fade-in duration-150">
-                    <span className="font-semibold text-red-600 dark:text-red-400 px-1">
-                      {selectedPurchaseIds.length} selected
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedPurchaseIds([])}
-                      className="h-7 text-xs px-2"
-                    >
-                      Clear
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => {
-                        setDeleteTargetPurchases(
-                          purchases.filter((p) =>
-                            selectedPurchaseIds.includes(p.id),
-                          ),
-                        );
-                        setIsDeletePurchaseOpen(true);
-                      }}
-                      className="h-7 text-xs px-3 bg-red-600 hover:bg-red-700 text-white font-semibold gap-1"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      Delete ({selectedPurchaseIds.length})
-                    </Button>
-                  </div>
-                )}
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider border-b border-[var(--pos-stroke)]">
-                        <th className="py-2 pr-3 w-8">
-                          <Checkbox
-                            checked={allPurchasesSelected}
-                            onCheckedChange={toggleSelectAllPurchases}
-                            aria-label="Select all purchases"
-                          />
-                        </th>
-                        <th className="py-2 pr-3">Date</th>
-                        <th className="py-2 pr-3">Supplier</th>
-                        <th className="py-2 pr-3">Items</th>
-                        <th className="py-2 pr-3 text-right">Total</th>
-                        <th className="py-2 pr-3 text-right">Paid</th>
-                        <th className="py-2 pr-3 text-right">Due</th>
-                        <th className="py-2 text-right">Status</th>
-                        <th className="py-2 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {purchases.map((p) => (
-                        <tr
-                          key={p.id}
-                          className="border-b border-[var(--pos-stroke)]/50 align-top hover:bg-foreground/[0.01] transition-colors"
+                      <div className="flex items-center gap-2 p-2.5 mb-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs justify-between sm:justify-start animate-in fade-in duration-150">
+                        <span className="font-semibold text-red-600 dark:text-red-400 px-1">
+                          {selectedPurchaseIds.length} selected
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedPurchaseIds([])}
+                          className="h-7 text-xs px-2"
                         >
-                          <td className="py-2 pr-3">
-                            <Checkbox
-                              checked={selectedPurchaseIds.includes(p.id)}
-                              onCheckedChange={() => toggleSelectPurchase(p.id)}
-                              aria-label={`Select purchase from ${p.pos_suppliers?.name || "Supplier"}`}
-                            />
-                          </td>
-                          <td className="py-2 pr-3 whitespace-nowrap">
-                            {p.purchase_date}
-                          </td>
-                          <td className="py-2 pr-3 whitespace-nowrap">
-                            {p.pos_suppliers?.name || "—"}
-                          </td>
-                          <td className="py-2 pr-3">
-                            <ul className="space-y-0.5">
-                              {p.pos_purchase_items.map((it) => (
-                                <li
-                                  key={it.id}
-                                  className="text-xs text-muted-foreground whitespace-nowrap flex items-center justify-between gap-2 py-0.5"
+                          Clear
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            setDeleteTargetPurchases(
+                              purchases.filter((p) =>
+                                selectedPurchaseIds.includes(p.id),
+                              ),
+                            );
+                            setIsDeletePurchaseOpen(true);
+                          }}
+                          className="h-7 text-xs px-3 bg-red-600 hover:bg-red-700 text-white font-semibold gap-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Delete ({selectedPurchaseIds.length})
+                        </Button>
+                      </div>
+                    )}
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider border-b border-[var(--pos-stroke)]">
+                            <th className="py-2 pr-3 w-8">
+                              <Checkbox
+                                checked={allPurchasesSelected}
+                                onCheckedChange={toggleSelectAllPurchases}
+                                aria-label="Select all purchases"
+                              />
+                            </th>
+                            <th className="py-2 pr-3">Date</th>
+                            <th className="py-2 pr-3">Supplier</th>
+                            <th className="py-2 pr-3">Items</th>
+                            <th className="py-2 pr-3 text-right">Total</th>
+                            <th className="py-2 pr-3 text-right">Paid</th>
+                            <th className="py-2 pr-3 text-right">Due</th>
+                            <th className="py-2 text-right">Status</th>
+                            <th className="py-2 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {purchases.map((p) => (
+                            <tr
+                              key={p.id}
+                              className="border-b border-[var(--pos-stroke)]/50 align-top hover:bg-foreground/[0.01] transition-colors"
+                            >
+                              <td className="py-2 pr-3">
+                                <Checkbox
+                                  checked={selectedPurchaseIds.includes(p.id)}
+                                  onCheckedChange={() =>
+                                    toggleSelectPurchase(p.id)
+                                  }
+                                  aria-label={`Select purchase from ${p.pos_suppliers?.name || "Supplier"}`}
+                                />
+                              </td>
+                              <td className="py-2 pr-3 whitespace-nowrap">
+                                {p.purchase_date}
+                              </td>
+                              <td className="py-2 pr-3 whitespace-nowrap">
+                                {p.pos_suppliers?.name || "—"}
+                              </td>
+                              <td className="py-2 pr-3">
+                                <ul className="space-y-0.5">
+                                  {p.pos_purchase_items.map((it) => (
+                                    <li
+                                      key={it.id}
+                                      className="text-xs text-muted-foreground whitespace-nowrap flex items-center justify-between gap-2 py-0.5"
+                                    >
+                                      <span>
+                                        {it.pos_products?.name || "—"} ×{" "}
+                                        {it.quantity} @ Rs.{it.unit_cost}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingItem({
+                                            id: it.id,
+                                            name:
+                                              it.pos_products?.name ||
+                                              "Product",
+                                            quantity: Number(it.quantity),
+                                            unit_cost: Number(it.unit_cost),
+                                          });
+                                          setEditQty(String(it.quantity));
+                                          setEditCost(String(it.unit_cost));
+                                        }}
+                                        className="p-1 rounded hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition ml-1 shrink-0"
+                                        title="Edit purchase quantity or price"
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </td>
+                              <td className="py-2 pr-3 text-right whitespace-nowrap">
+                                {formatMoney(Number(p.total_amount) || 0)}
+                              </td>
+                              <td className="py-2 pr-3 text-right whitespace-nowrap">
+                                {formatMoney(Number(p.amount_paid) || 0)}
+                              </td>
+                              <td className="py-2 pr-3 text-right whitespace-nowrap">
+                                {formatMoney(Number(p.amount_due) || 0)}
+                              </td>
+                              <td className="py-2 text-right whitespace-nowrap">
+                                <span
+                                  className={cn(
+                                    "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase",
+                                    p.payment_status === "paid" &&
+                                      "bg-emerald-500/10 text-emerald-500",
+                                    p.payment_status === "partial" &&
+                                      "bg-amber-500/10 text-amber-500",
+                                    p.payment_status === "unpaid" &&
+                                      "bg-red-500/10 text-red-500",
+                                  )}
                                 >
-                                  <span>
-                                    {it.pos_products?.name || "—"} ×{" "}
-                                    {it.quantity} @ Rs.{it.unit_cost}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setEditingItem({
-                                        id: it.id,
-                                        name:
-                                          it.pos_products?.name || "Product",
-                                        quantity: Number(it.quantity),
-                                        unit_cost: Number(it.unit_cost),
-                                      });
-                                      setEditQty(String(it.quantity));
-                                      setEditCost(String(it.unit_cost));
-                                    }}
-                                    className="p-1 rounded hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition ml-1 shrink-0"
-                                    title="Edit purchase quantity or price"
-                                  >
-                                    <Pencil className="w-3 h-3" />
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          </td>
-                          <td className="py-2 pr-3 text-right whitespace-nowrap">
-                            {formatMoney(Number(p.total_amount) || 0)}
-                          </td>
-                          <td className="py-2 pr-3 text-right whitespace-nowrap">
-                            {formatMoney(Number(p.amount_paid) || 0)}
-                          </td>
-                          <td className="py-2 pr-3 text-right whitespace-nowrap">
-                            {formatMoney(Number(p.amount_due) || 0)}
-                          </td>
-                          <td className="py-2 text-right whitespace-nowrap">
-                            <span
-                              className={cn(
-                                "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase",
-                                p.payment_status === "paid" &&
-                                  "bg-emerald-500/10 text-emerald-500",
-                                p.payment_status === "partial" &&
-                                  "bg-amber-500/10 text-amber-500",
-                                p.payment_status === "unpaid" &&
-                                  "bg-red-500/10 text-red-500",
-                              )}
-                            >
-                              {p.payment_status}
-                            </span>
-                          </td>
-                          <td className="py-2 text-right whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDeleteTargetPurchases([p]);
-                                setIsDeletePurchaseOpen(true);
-                              }}
-                              className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 transition"
-                              title="Delete purchase"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-            </div>
+                                  {p.payment_status}
+                                </span>
+                              </td>
+                              <td className="py-2 text-right whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDeleteTargetPurchases([p]);
+                                    setIsDeletePurchaseOpen(true);
+                                  }}
+                                  className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 transition"
+                                  title="Delete purchase"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </div>
             </TabsContent>
 
             <TabsContent value="add">
@@ -798,7 +801,9 @@ export default function PurchasesPage() {
         purchases={deleteTargetPurchases}
         onSuccess={async () => {
           setSelectedPurchaseIds((prev) =>
-            prev.filter((id) => !deleteTargetPurchases.some((p) => p.id === id)),
+            prev.filter(
+              (id) => !deleteTargetPurchases.some((p) => p.id === id),
+            ),
           );
           setDeleteTargetPurchases([]);
           await loadPurchases();

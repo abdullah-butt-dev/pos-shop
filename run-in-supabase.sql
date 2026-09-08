@@ -262,3 +262,4 @@ GRANT EXECUTE ON FUNCTION pos_delete_sales_bulk(UUID[]) TO authenticated, anon, 
 GRANT EXECUTE ON FUNCTION pos_delete_purchase(UUID) TO authenticated, anon, service_role;
 GRANT EXECUTE ON FUNCTION pos_delete_purchases_bulk(UUID[]) TO authenticated, anon, service_role;
 NOTIFY pgrst, 'reload schema';
+
