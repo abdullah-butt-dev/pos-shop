@@ -384,48 +384,6 @@ export function downloadPosReceiptPDF(
   return doc;
 }
 
-export function printPosReceiptPDF(
-  receipt: PosReceiptData,
-  targetIframe?: HTMLIFrameElement | null,
-): jsPDF {
-  const doc = buildPosReceiptDoc(receipt);
-  const fileName = `${receipt.receiptNumber || "receipt"}.pdf`;
-  doc.save(fileName);
-
-  if (typeof document !== "undefined") {
-    const blobUrl = String(doc.output("bloburl"));
-    const iframe = targetIframe || document.createElement("iframe");
-
-    if (!targetIframe) {
-      iframe.style.position = "fixed";
-      iframe.style.right = "0";
-      iframe.style.bottom = "0";
-      iframe.style.width = "0";
-      iframe.style.height = "0";
-      iframe.style.border = "0";
-      document.body.appendChild(iframe);
-    }
-
-    iframe.onload = () => {
-      try {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      } catch (err) {
-        console.error("Failed to trigger print on iframe:", err);
-      }
-      setTimeout(() => {
-        try {
-          iframe.remove();
-        } catch {}
-      }, 60000);
-    };
-
-    iframe.src = blobUrl;
-  }
-
-  return doc;
-}
-
 // Background preload Urdu font when loaded in browser
 if (typeof window !== "undefined") {
   ensureUrduFont().catch(() => {});

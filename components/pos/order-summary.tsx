@@ -5,7 +5,6 @@ import {
   Download,
   Minus,
   Plus,
-  Printer,
   ShoppingBag,
   Trash2,
   User,
@@ -36,7 +35,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   downloadPosReceiptPDF,
-  printPosReceiptPDF,
   ensureUrduFont,
   formatPakistanDateTime,
   type PosReceiptData,
@@ -165,29 +163,15 @@ export function OrderSummary({
     setIsConfirmOpen(true);
   };
 
-  const executeSaveSale = async (mode: "download" | "print") => {
-    // 1. Synchronously initiate user gesture action before any await to avoid popup/print blockers
-    let popupWindow: Window | null = null;
-    let printIframe: HTMLIFrameElement | null = null;
-
-    if (mode === "download") {
-      popupWindow = window.open("", "_blank");
-      if (popupWindow) {
-        try {
-          popupWindow.document.write(
-            "<!DOCTYPE html><html><head><title>Receipt</title></head><body style='font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#666;'><p>Generating receipt...</p></body></html>",
-          );
-        } catch {}
-      }
-    } else if (mode === "print") {
-      printIframe = document.createElement("iframe");
-      printIframe.style.position = "fixed";
-      printIframe.style.right = "0";
-      printIframe.style.bottom = "0";
-      printIframe.style.width = "0";
-      printIframe.style.height = "0";
-      printIframe.style.border = "0";
-      document.body.appendChild(printIframe);
+  const executeSaveSale = async () => {
+    // 1. Synchronously initiate user gesture action before any await to avoid popup blockers
+    const popupWindow = window.open("", "_blank");
+    if (popupWindow) {
+      try {
+        popupWindow.document.write(
+          "<!DOCTYPE html><html><head><title>Receipt</title></head><body style='font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#666;'><p>Generating receipt...</p></body></html>",
+        );
+      } catch {}
     }
 
     setIsConfirmOpen(false);
@@ -238,15 +222,10 @@ export function OrderSummary({
       };
 
       try {
-        if (mode === "download") {
-          downloadPosReceiptPDF(receiptData, popupWindow);
-        } else {
-          printPosReceiptPDF(receiptData, printIframe);
-        }
+        downloadPosReceiptPDF(receiptData, popupWindow);
       } catch (pdfErr) {
         console.error("PDF receipt generation error:", pdfErr);
         if (popupWindow) popupWindow.close();
-        if (printIframe) printIframe.remove();
         toast.error("Failed to generate receipt PDF");
       }
 
@@ -258,17 +237,12 @@ export function OrderSummary({
       await refetchData?.();
 
       setSuccess(true);
-      toast.success(
-        mode === "download"
-          ? "Sale saved & receipt downloaded"
-          : "Sale saved & sent to printer",
-      );
+      toast.success("Sale saved & receipt downloaded");
 
       window.setTimeout(() => setSuccess(false), 1500);
     } catch (error) {
       console.error("Failed to save sale:", error);
       if (popupWindow) popupWindow.close();
-      if (printIframe) printIframe.remove();
 
       toast.error(
         error instanceof Error ? error.message : "Failed to save sale",
@@ -642,22 +616,12 @@ export function OrderSummary({
             <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
             <Button
               type="button"
-              variant="outline"
-              onClick={() => executeSaveSale("download")}
-              disabled={saving}
-              className="gap-1.5 font-semibold"
-            >
-              <Download className="w-4 h-4" />
-              {saving ? "Saving..." : "Download"}
-            </Button>
-            <Button
-              type="button"
-              onClick={() => executeSaveSale("print")}
+              onClick={executeSaveSale}
               disabled={saving}
               className="bg-[var(--pos-brand)] text-black hover:opacity-90 font-semibold gap-1.5"
             >
-              <Printer className="w-4 h-4" />
-              {saving ? "Saving..." : "Download & Print"}
+              <Download className="w-4 h-4" />
+              {saving ? "Saving..." : "Download"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
