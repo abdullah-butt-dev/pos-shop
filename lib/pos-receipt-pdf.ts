@@ -58,7 +58,7 @@ interface RenderedFooterImage {
   heightMm: number;
 }
 
-async function ensureUrduFont(): Promise<void> {
+export async function ensureUrduFont(): Promise<void> {
   if (typeof document === "undefined" || !("fonts" in document)) return;
 
   try {
@@ -333,14 +333,11 @@ function drawReceipt(
   return y;
 }
 
-export async function generatePosReceiptPDF(
-  receipt: PosReceiptData,
-): Promise<void> {
+export function buildPosReceiptDoc(receipt: PosReceiptData): jsPDF {
   const footerText = receipt.receiptFooterText?.trim();
   let footerImg: RenderedFooterImage | null = null;
 
   if (footerText) {
-    await ensureUrduFont();
     footerImg = renderUrduFooterCanvas(footerText, CONTENT_WIDTH);
   }
 
@@ -353,5 +350,84 @@ export async function generatePosReceiptPDF(
   const doc = new jsPDF({ unit: "mm", format: [WIDTH, finalY] });
   drawReceipt(doc, receipt, footerImg);
 
+  return doc;
+}
+
+export function downloadPosReceiptPDF(
+  receipt: PosReceiptData,
+  targetWindow?: Window | null,
+): jsPDF {
+  const doc = buildPosReceiptDoc(receipt);
+  const fileName = `${receipt.receiptNumber || "receipt"}.pdf`;
+  doc.save(fileName);
+
+  if (typeof window !== "undefined") {
+    const blobUrl = String(doc.output("bloburl"));
+    if (targetWindow && !targetWindow.closed) {
+      try {
+        targetWindow.location.href = blobUrl;
+      } catch {
+        window.open(blobUrl, "_blank");
+      }
+    } else {
+      window.open(blobUrl, "_blank");
+    }
+  }
+
+  return doc;
+}
+
+export function printPosReceiptPDF(
+  receipt: PosReceiptData,
+  targetIframe?: HTMLIFrameElement | null,
+): jsPDF {
+  const doc = buildPosReceiptDoc(receipt);
+  const fileName = `${receipt.receiptNumber || "receipt"}.pdf`;
+  doc.save(fileName);
+
+  if (typeof document !== "undefined") {
+    const blobUrl = String(doc.output("bloburl"));
+    const iframe = targetIframe || document.createElement("iframe");
+
+    if (!targetIframe) {
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      document.body.appendChild(iframe);
+    }
+
+    iframe.onload = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error("Failed to trigger print on iframe:", err);
+      }
+      setTimeout(() => {
+        try {
+          iframe.remove();
+        } catch {}
+      }, 60000);
+    };
+
+    iframe.src = blobUrl;
+  }
+
+  return doc;
+}
+
+export async function generatePosReceiptPDF(
+  receipt: PosReceiptData,
+): Promise<void> {
+  await ensureUrduFont();
+  const doc = buildPosReceiptDoc(receipt);
   doc.save(`${receipt.receiptNumber || "receipt"}.pdf`);
+}
+
+// Background preload Urdu font when loaded in browser
+if (typeof window !== "undefined") {
+  ensureUrduFont().catch(() => {});
 }

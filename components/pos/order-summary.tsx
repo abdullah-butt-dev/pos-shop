@@ -1,6 +1,15 @@
 "use client";
 
-import { Check, Minus, Plus, ShoppingBag, Trash2, User } from "lucide-react";
+import {
+  Check,
+  Download,
+  Minus,
+  Plus,
+  Printer,
+  ShoppingBag,
+  Trash2,
+  User,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useCart } from "./cart-context";
@@ -8,15 +17,16 @@ import {
   PosCustomerService,
   PosSaleService,
   PosSettingsService,
+  type PosBusinessSettingsRow,
 } from "@/lib/pos-service";
 import {
   AutocompleteField,
   type AutocompleteOption,
 } from "@/components/purchases/autocomplete-field";
 import { InfoTooltip } from "@/components/pos/info-tooltip";
+import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -25,8 +35,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  generatePosReceiptPDF,
+  downloadPosReceiptPDF,
+  printPosReceiptPDF,
+  ensureUrduFont,
   formatPakistanDateTime,
+  type PosReceiptData,
 } from "@/lib/pos-receipt-pdf";
 
 type PaymentMode = "paid" | "credit" | "partial";
@@ -48,6 +61,14 @@ export function OrderSummary({
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [settings, setSettings] = useState<PosBusinessSettingsRow | null>(null);
+
+  useEffect(() => {
+    ensureUrduFont().catch(() => {});
+    PosSettingsService.get()
+      .then((data) => setSettings(data))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (paymentMode === "paid") {
@@ -144,7 +165,31 @@ export function OrderSummary({
     setIsConfirmOpen(true);
   };
 
-  const executeSaveSale = async () => {
+  const executeSaveSale = async (mode: "download" | "print") => {
+    // 1. Synchronously initiate user gesture action before any await to avoid popup/print blockers
+    let popupWindow: Window | null = null;
+    let printIframe: HTMLIFrameElement | null = null;
+
+    if (mode === "download") {
+      popupWindow = window.open("", "_blank");
+      if (popupWindow) {
+        try {
+          popupWindow.document.write(
+            "<!DOCTYPE html><html><head><title>Receipt</title></head><body style='font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#666;'><p>Generating receipt...</p></body></html>",
+          );
+        } catch {}
+      }
+    } else if (mode === "print") {
+      printIframe = document.createElement("iframe");
+      printIframe.style.position = "fixed";
+      printIframe.style.right = "0";
+      printIframe.style.bottom = "0";
+      printIframe.style.width = "0";
+      printIframe.style.height = "0";
+      printIframe.style.border = "0";
+      document.body.appendChild(printIframe);
+    }
+
     setIsConfirmOpen(false);
     setSaving(true);
 
@@ -163,39 +208,47 @@ export function OrderSummary({
         })),
       });
 
-      // Fetch business settings for receipt header details
-      const settings = await PosSettingsService.get().catch(() => null);
+      const currentSettings =
+        settings || (await PosSettingsService.get().catch(() => null));
 
-      // Auto-generate & download PDF receipt
+      const receiptData: PosReceiptData = {
+        shopName: currentSettings?.shop_name || "Perfect Traders",
+        shopAddress: currentSettings?.address || "Suraj Miani Road, Multan",
+        shopPhone: currentSettings?.phone || "03134640267",
+        receiptFooterText: currentSettings?.receipt_footer_text,
+        receiptNumber:
+          (saleResult as any)?.receipt_number ||
+          `PT-${Date.now().toString().slice(-4)}`,
+        dateTime: formatPakistanDateTime(new Date()),
+        customerName: customer?.name || "Walk-in Customer",
+        items: items.map((i) => ({
+          name: i.name,
+          quantity: i.qty,
+          unit_price: i.price,
+          line_total: i.qty * i.price,
+        })),
+        itemCount: items.length,
+        unitCount: items.reduce((sum, i) => sum + i.qty, 0),
+        grandTotal: subtotal,
+        paidAmount: normalizedAmount,
+        remainingAmount: Math.max(subtotal - normalizedAmount, 0),
+        paymentStatus: paymentMode,
+        paymentMode:
+          paymentMode.charAt(0).toUpperCase() + paymentMode.slice(1),
+        currency: currentSettings?.currency || "PKR",
+      };
+
       try {
-        generatePosReceiptPDF({
-          shopName: settings?.shop_name || "Perfect Traders",
-          shopAddress: settings?.address || "Suraj Miani Road, Multan",
-          shopPhone: settings?.phone || "03134640267",
-          receiptFooterText: settings?.receipt_footer_text,
-          receiptNumber:
-            (saleResult as any)?.receipt_number ||
-            `PT-${Date.now().toString().slice(-4)}`,
-          dateTime: formatPakistanDateTime(new Date()),
-          customerName: customer?.name || "Walk-in Customer",
-          items: items.map((i) => ({
-            name: i.name,
-            quantity: i.qty,
-            unit_price: i.price,
-            line_total: i.qty * i.price,
-          })),
-          itemCount: items.length,
-          unitCount: items.reduce((sum, i) => sum + i.qty, 0),
-          grandTotal: subtotal,
-          paidAmount: normalizedAmount,
-          remainingAmount: Math.max(subtotal - normalizedAmount, 0),
-          paymentStatus: paymentMode,
-          paymentMode:
-            paymentMode.charAt(0).toUpperCase() + paymentMode.slice(1),
-          currency: settings?.currency || "PKR",
-        });
+        if (mode === "download") {
+          downloadPosReceiptPDF(receiptData, popupWindow);
+        } else {
+          printPosReceiptPDF(receiptData, printIframe);
+        }
       } catch (pdfErr) {
         console.error("PDF receipt generation error:", pdfErr);
+        if (popupWindow) popupWindow.close();
+        if (printIframe) printIframe.remove();
+        toast.error("Failed to generate receipt PDF");
       }
 
       clear();
@@ -206,11 +259,17 @@ export function OrderSummary({
       await refetchData?.();
 
       setSuccess(true);
-      toast.success("Sale saved and receipt generated");
+      toast.success(
+        mode === "download"
+          ? "Sale saved & receipt downloaded"
+          : "Sale saved & sent to printer",
+      );
 
       window.setTimeout(() => setSuccess(false), 1500);
     } catch (error) {
       console.error("Failed to save sale:", error);
+      if (popupWindow) popupWindow.close();
+      if (printIframe) printIframe.remove();
 
       toast.error(
         error instanceof Error ? error.message : "Failed to save sale",
@@ -580,15 +639,27 @@ export function OrderSummary({
             </div>
           </div>
 
-          <AlertDialogFooter>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={executeSaveSale}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => executeSaveSale("download")}
               disabled={saving}
-              className="bg-[var(--pos-brand)] text-black hover:opacity-90 font-semibold"
+              className="gap-1.5 font-semibold"
             >
-              {saving ? "Saving..." : "Confirm & Print"}
-            </AlertDialogAction>
+              <Download className="w-4 h-4" />
+              {saving ? "Saving..." : "Download"}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => executeSaveSale("print")}
+              disabled={saving}
+              className="bg-[var(--pos-brand)] text-black hover:opacity-90 font-semibold gap-1.5"
+            >
+              <Printer className="w-4 h-4" />
+              {saving ? "Saving..." : "Download & Print"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
