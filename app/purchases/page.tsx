@@ -23,15 +23,8 @@ import {
 import { InfoTooltip } from "@/components/pos/info-tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DeletePurchasesModal } from "@/components/pos/delete-purchases-modal";
 import {
   PosInventoryService,
   PosProductService,
@@ -89,13 +82,29 @@ export default function PurchasesPage() {
   const [purchasesLoading, setPurchasesLoading] = useState(true);
   const [inventory, setInventory] = useState<PosInventoryRow[]>([]);
 
-  const [deleteTargetPurchase, setDeleteTargetPurchase] =
-    useState<PosPurchaseWithRelations | null>(null);
+  const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<string[]>([]);
+  const [deleteTargetPurchases, setDeleteTargetPurchases] = useState<
+    PosPurchaseWithRelations[]
+  >([]);
   const [isDeletePurchaseOpen, setIsDeletePurchaseOpen] = useState(false);
-  const [deletePurchaseLoading, setDeletePurchaseLoading] = useState(false);
-  const [deleteBlockingError, setDeleteBlockingError] = useState<string | null>(
-    null,
-  );
+
+  const allPurchasesSelected =
+    purchases.length > 0 &&
+    purchases.every((p) => selectedPurchaseIds.includes(p.id));
+
+  const toggleSelectAllPurchases = () => {
+    if (allPurchasesSelected) {
+      setSelectedPurchaseIds([]);
+    } else {
+      setSelectedPurchaseIds(purchases.map((p) => p.id));
+    }
+  };
+
+  const toggleSelectPurchase = (id: string) => {
+    setSelectedPurchaseIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
 
   const loadPurchases = useCallback(async () => {
     setPurchasesLoading(true);
@@ -266,26 +275,6 @@ export default function PurchasesPage() {
     }
   }
 
-  async function handleDeletePurchase() {
-    if (!deleteTargetPurchase) return;
-    setDeletePurchaseLoading(true);
-    setDeleteBlockingError(null);
-    try {
-      await PosPurchaseService.delete(deleteTargetPurchase.id);
-      toast.success("Purchase deleted and stock updated");
-      setIsDeletePurchaseOpen(false);
-      setDeleteTargetPurchase(null);
-      await loadPurchases();
-      await loadInventory();
-    } catch (err: any) {
-      const msg = err?.message || "Failed to delete purchase";
-      setDeleteBlockingError(msg);
-      toast.error(msg);
-    } finally {
-      setDeletePurchaseLoading(false);
-    }
-  }
-
   return (
     <main className="h-full w-full flex flex-col overflow-hidden bg-[var(--pos-panel-2)] text-foreground">
       <NavHeader />
@@ -330,110 +319,158 @@ export default function PurchasesPage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider border-b border-[var(--pos-stroke)]">
-                          <th className="py-2 pr-3">Date</th>
-                          <th className="py-2 pr-3">Supplier</th>
-                          <th className="py-2 pr-3">Items</th>
-                          <th className="py-2 pr-3 text-right">Total</th>
-                          <th className="py-2 pr-3 text-right">Paid</th>
-                          <th className="py-2 pr-3 text-right">Due</th>
-                          <th className="py-2 text-right">Status</th>
-                          <th className="py-2 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {purchases.map((p) => (
-                          <tr
-                            key={p.id}
-                            className="border-b border-[var(--pos-stroke)]/50 align-top hover:bg-foreground/[0.01] transition-colors"
-                          >
-                            <td className="py-2 pr-3 whitespace-nowrap">
-                              {p.purchase_date}
-                            </td>
-                            <td className="py-2 pr-3 whitespace-nowrap">
-                              {p.pos_suppliers?.name || "—"}
-                            </td>
-                            <td className="py-2 pr-3">
-                              <ul className="space-y-0.5">
-                                {p.pos_purchase_items.map((it) => (
-                                  <li
-                                    key={it.id}
-                                    className="text-xs text-muted-foreground whitespace-nowrap flex items-center justify-between gap-2 py-0.5"
-                                  >
-                                    <span>
-                                      {it.pos_products?.name || "—"} ×{" "}
-                                      {it.quantity} @ Rs.{it.unit_cost}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setEditingItem({
-                                          id: it.id,
-                                          name:
-                                            it.pos_products?.name || "Product",
-                                          quantity: Number(it.quantity),
-                                          unit_cost: Number(it.unit_cost),
-                                        });
-                                        setEditQty(String(it.quantity));
-                                        setEditCost(String(it.unit_cost));
-                                      }}
-                                      className="p-1 rounded hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition ml-1 shrink-0"
-                                      title="Edit purchase quantity or price"
-                                    >
-                                      <Pencil className="w-3 h-3" />
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            </td>
-                            <td className="py-2 pr-3 text-right whitespace-nowrap">
-                              {formatMoney(Number(p.total_amount) || 0)}
-                            </td>
-                            <td className="py-2 pr-3 text-right whitespace-nowrap">
-                              {formatMoney(Number(p.amount_paid) || 0)}
-                            </td>
-                            <td className="py-2 pr-3 text-right whitespace-nowrap">
-                              {formatMoney(Number(p.amount_due) || 0)}
-                            </td>
-                            <td className="py-2 text-right whitespace-nowrap">
-                              <span
-                                className={cn(
-                                  "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase",
-                                  p.payment_status === "paid" &&
-                                    "bg-emerald-500/10 text-emerald-500",
-                                  p.payment_status === "partial" &&
-                                    "bg-amber-500/10 text-amber-500",
-                                  p.payment_status === "unpaid" &&
-                                    "bg-red-500/10 text-red-500",
-                                )}
-                              >
-                                {p.payment_status}
-                              </span>
-                            </td>
-                            <td className="py-2 text-right whitespace-nowrap">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDeleteTargetPurchase(p);
-                                  setDeleteBlockingError(null);
-                                  setIsDeletePurchaseOpen(true);
-                                }}
-                                className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 transition"
-                                title="Delete purchase"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <>
+                    {selectedPurchaseIds.length > 0 && (
+                  <div className="flex items-center gap-2 p-2.5 mb-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs justify-between sm:justify-start animate-in fade-in duration-150">
+                    <span className="font-semibold text-red-600 dark:text-red-400 px-1">
+                      {selectedPurchaseIds.length} selected
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedPurchaseIds([])}
+                      className="h-7 text-xs px-2"
+                    >
+                      Clear
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        setDeleteTargetPurchases(
+                          purchases.filter((p) =>
+                            selectedPurchaseIds.includes(p.id),
+                          ),
+                        );
+                        setIsDeletePurchaseOpen(true);
+                      }}
+                      className="h-7 text-xs px-3 bg-red-600 hover:bg-red-700 text-white font-semibold gap-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete ({selectedPurchaseIds.length})
+                    </Button>
                   </div>
                 )}
-              </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider border-b border-[var(--pos-stroke)]">
+                        <th className="py-2 pr-3 w-8">
+                          <Checkbox
+                            checked={allPurchasesSelected}
+                            onCheckedChange={toggleSelectAllPurchases}
+                            aria-label="Select all purchases"
+                          />
+                        </th>
+                        <th className="py-2 pr-3">Date</th>
+                        <th className="py-2 pr-3">Supplier</th>
+                        <th className="py-2 pr-3">Items</th>
+                        <th className="py-2 pr-3 text-right">Total</th>
+                        <th className="py-2 pr-3 text-right">Paid</th>
+                        <th className="py-2 pr-3 text-right">Due</th>
+                        <th className="py-2 text-right">Status</th>
+                        <th className="py-2 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {purchases.map((p) => (
+                        <tr
+                          key={p.id}
+                          className="border-b border-[var(--pos-stroke)]/50 align-top hover:bg-foreground/[0.01] transition-colors"
+                        >
+                          <td className="py-2 pr-3">
+                            <Checkbox
+                              checked={selectedPurchaseIds.includes(p.id)}
+                              onCheckedChange={() => toggleSelectPurchase(p.id)}
+                              aria-label={`Select purchase from ${p.pos_suppliers?.name || "Supplier"}`}
+                            />
+                          </td>
+                          <td className="py-2 pr-3 whitespace-nowrap">
+                            {p.purchase_date}
+                          </td>
+                          <td className="py-2 pr-3 whitespace-nowrap">
+                            {p.pos_suppliers?.name || "—"}
+                          </td>
+                          <td className="py-2 pr-3">
+                            <ul className="space-y-0.5">
+                              {p.pos_purchase_items.map((it) => (
+                                <li
+                                  key={it.id}
+                                  className="text-xs text-muted-foreground whitespace-nowrap flex items-center justify-between gap-2 py-0.5"
+                                >
+                                  <span>
+                                    {it.pos_products?.name || "—"} ×{" "}
+                                    {it.quantity} @ Rs.{it.unit_cost}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingItem({
+                                        id: it.id,
+                                        name:
+                                          it.pos_products?.name || "Product",
+                                        quantity: Number(it.quantity),
+                                        unit_cost: Number(it.unit_cost),
+                                      });
+                                      setEditQty(String(it.quantity));
+                                      setEditCost(String(it.unit_cost));
+                                    }}
+                                    className="p-1 rounded hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition ml-1 shrink-0"
+                                    title="Edit purchase quantity or price"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          </td>
+                          <td className="py-2 pr-3 text-right whitespace-nowrap">
+                            {formatMoney(Number(p.total_amount) || 0)}
+                          </td>
+                          <td className="py-2 pr-3 text-right whitespace-nowrap">
+                            {formatMoney(Number(p.amount_paid) || 0)}
+                          </td>
+                          <td className="py-2 pr-3 text-right whitespace-nowrap">
+                            {formatMoney(Number(p.amount_due) || 0)}
+                          </td>
+                          <td className="py-2 text-right whitespace-nowrap">
+                            <span
+                              className={cn(
+                                "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase",
+                                p.payment_status === "paid" &&
+                                  "bg-emerald-500/10 text-emerald-500",
+                                p.payment_status === "partial" &&
+                                  "bg-amber-500/10 text-amber-500",
+                                p.payment_status === "unpaid" &&
+                                  "bg-red-500/10 text-red-500",
+                              )}
+                            >
+                              {p.payment_status}
+                            </span>
+                          </td>
+                          <td className="py-2 text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDeleteTargetPurchases([p]);
+                                setIsDeletePurchaseOpen(true);
+                              }}
+                              className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-500/10 transition"
+                              title="Delete purchase"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
             </TabsContent>
 
             <TabsContent value="add">
@@ -755,105 +792,19 @@ export default function PurchasesPage() {
         </div>
       )}
 
-      {deleteTargetPurchase && (
-        <AlertDialog
-          open={isDeletePurchaseOpen}
-          onOpenChange={(open) => {
-            if (!open) {
-              setIsDeletePurchaseOpen(false);
-              setDeleteBlockingError(null);
-            }
-          }}
-        >
-          <AlertDialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-            <AlertDialogHeader>
-              <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                <AlertTriangle className="w-5 h-5" />
-                <AlertDialogTitle className="text-lg">
-                  Delete Purchase?
-                </AlertDialogTitle>
-              </div>
-              <AlertDialogDescription>
-                This will delete the purchase from supplier{" "}
-                <span className="font-semibold text-foreground">
-                  {deleteTargetPurchase.pos_suppliers?.name || "Supplier"}
-                </span>{" "}
-                dated {deleteTargetPurchase.purchase_date}, reverse any supplier
-                payments, and deduct the purchased items from inventory.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-
-            {deleteBlockingError && (
-              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs flex gap-2.5 items-start">
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
-                <div className="space-y-1">
-                  <p className="font-bold">Cannot delete this purchase</p>
-                  <p className="leading-relaxed">{deleteBlockingError}</p>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2 text-xs p-3 rounded-xl bg-foreground/5 border border-[var(--pos-stroke)]">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Purchase:</span>
-                <span className="font-bold">
-                  {formatMoney(
-                    Number(deleteTargetPurchase.total_amount) || 0,
-                  )}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Amount Paid:</span>
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                  {formatMoney(Number(deleteTargetPurchase.amount_paid) || 0)}
-                </span>
-              </div>
-              <div className="pt-2 border-t border-[var(--pos-stroke)]">
-                <span className="text-muted-foreground block mb-1">
-                  Items to deduct from inventory:
-                </span>
-                <div className="space-y-1 max-h-32 overflow-y-auto">
-                  {deleteTargetPurchase.pos_purchase_items.map((it) => (
-                    <div
-                      key={it.id}
-                      className="flex justify-between text-muted-foreground"
-                    >
-                      <span>{it.pos_products?.name || "Product"}</span>
-                      <span className="font-semibold text-red-500">
-                        -{it.quantity} units
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <AlertDialogFooter className="gap-2 sm:gap-0">
-              <AlertDialogCancel disabled={deletePurchaseLoading}>
-                Cancel
-              </AlertDialogCancel>
-              <Button
-                type="button"
-                disabled={deletePurchaseLoading}
-                onClick={handleDeletePurchase}
-                className="bg-red-600 hover:bg-red-700 text-white font-semibold gap-1.5"
-              >
-                {deletePurchaseLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-4 h-4" />
-                    Yes, delete purchase
-                  </>
-                )}
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+      <DeletePurchasesModal
+        open={isDeletePurchaseOpen}
+        onOpenChange={setIsDeletePurchaseOpen}
+        purchases={deleteTargetPurchases}
+        onSuccess={async () => {
+          setSelectedPurchaseIds((prev) =>
+            prev.filter((id) => !deleteTargetPurchases.some((p) => p.id === id)),
+          );
+          setDeleteTargetPurchases([]);
+          await loadPurchases();
+          await loadInventory();
+        }}
+      />
     </main>
   );
 }

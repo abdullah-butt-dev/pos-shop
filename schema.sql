@@ -932,6 +932,7 @@ AS $$
 DECLARE
   v_id UUID;
   v_count INT := 0;
+  v_missing_count INT := 0;
   v_results JSONB := '[]'::JSONB;
   v_single_res JSONB;
 BEGIN
@@ -940,18 +941,19 @@ BEGIN
   END IF;
 
   -- 1. Verify ALL sales exist upfront. If ANY is missing, abort the entire batch.
-  FOREACH v_id IN ARRAY p_sale_ids
-  LOOP
-    IF NOT EXISTS (SELECT 1 FROM pos_sales WHERE id = v_id) THEN
-      RAISE EXCEPTION 'Sale ID % not found. Entire bulk deletion cancelled.', v_id;
-    END IF;
-  END LOOP;
+  SELECT count(*) INTO v_missing_count
+  FROM unnest(p_sale_ids) AS expected(id)
+  WHERE NOT EXISTS (SELECT 1 FROM pos_sales s WHERE s.id = expected.id);
+
+  IF v_missing_count > 0 THEN
+    RAISE EXCEPTION '% of the selected sales do not exist in the database. Entire bulk deletion cancelled.', v_missing_count;
+  END IF;
 
   -- 2. Delete each sale in single atomic transaction
   FOREACH v_id IN ARRAY p_sale_ids
   LOOP
     v_single_res := pos_delete_sale(v_id);
-    v_results := v_results || v_single_res;
+    v_results := v_results || jsonb_build_array(v_single_res);
     v_count := v_count + 1;
   END LOOP;
 
@@ -1030,12 +1032,85 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION pos_delete_purchases_bulk(p_purchase_ids UUID[])
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_id UUID;
+  v_count INT := 0;
+  v_missing_count INT := 0;
+  v_blocking_details TEXT;
+  v_results JSONB := '[]'::JSONB;
+  v_single_res JSONB;
+BEGIN
+  IF p_purchase_ids IS NULL OR array_length(p_purchase_ids, 1) IS NULL OR array_length(p_purchase_ids, 1) = 0 THEN
+    RAISE EXCEPTION 'No purchase IDs provided for bulk deletion';
+  END IF;
+
+  -- 1. Verify ALL purchases exist upfront. If ANY is missing, abort the entire batch.
+  SELECT count(*) INTO v_missing_count
+  FROM unnest(p_purchase_ids) AS expected(id)
+  WHERE NOT EXISTS (SELECT 1 FROM pos_purchases p WHERE p.id = expected.id);
+
+  IF v_missing_count > 0 THEN
+    RAISE EXCEPTION '% of the selected purchases do not exist in the database. Entire bulk deletion cancelled.', v_missing_count;
+  END IF;
+
+  -- 2. Check if ANY purchase in the batch is blocked by sales allocations.
+  -- If blocked, report ALL blocking purchases, sales, and products in a detailed exception.
+  SELECT string_agg(
+    DISTINCT concat(
+      'Purchase on ', pur.purchase_date,
+      CASE WHEN pur.reference_number IS NOT NULL AND pur.reference_number <> '' THEN ' (Ref: ' || pur.reference_number || ')' ELSE '' END,
+      ' blocked by sale ', s.receipt_number,
+      ' (Product: ', p.name, ')'
+    ),
+    E'\n'
+  )
+  INTO v_blocking_details
+  FROM pos_sale_cost_allocations a
+  JOIN pos_sale_items si ON si.id = a.sale_item_id
+  JOIN pos_sales s ON s.id = si.sale_id
+  JOIN pos_purchase_items pi ON pi.id = a.purchase_item_id
+  JOIN pos_purchases pur ON pur.id = pi.purchase_id
+  JOIN pos_products p ON p.id = pi.product_id
+  WHERE pi.purchase_id = ANY(p_purchase_ids);
+
+  IF v_blocking_details IS NOT NULL AND v_blocking_details <> '' THEN
+    RAISE EXCEPTION 'Cannot delete purchases: one or more purchases have items already sold in sales:
+%
+Entire bulk deletion cancelled. Please delete or adjust the blocking sales first.', v_blocking_details;
+  END IF;
+
+  -- 3. Delete each purchase in single atomic transaction
+  FOREACH v_id IN ARRAY p_purchase_ids
+  LOOP
+    v_single_res := pos_delete_purchase(v_id);
+    v_results := v_results || jsonb_build_array(v_single_res);
+    v_count := v_count + 1;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'success', TRUE,
+    'deleted_count', v_count,
+    'purchases', v_results
+  );
+END;
+$$;
+
 -- ----------------------------------------------------------------------------
 -- PERMISSIONS & GRANTS
 -- ----------------------------------------------------------------------------
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, anon, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated, anon, service_role;
 GRANT ALL ON ALL ROUTINES IN SCHEMA public TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION pos_delete_sale(UUID) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION pos_delete_sales_bulk(UUID[]) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION pos_delete_purchase(UUID) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION pos_delete_purchases_bulk(UUID[]) TO authenticated, anon, service_role;
+NOTIFY pgrst, 'reload schema';
 
 -- ----------------------------------------------------------------------------
 -- POSTGRES TIMEZONE & SAFE BACKFILL MIGRATION

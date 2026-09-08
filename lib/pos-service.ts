@@ -359,6 +359,20 @@ export class PosPurchaseService {
     }
     return json.data;
   }
+
+  static async deleteBulk(ids: string[]): Promise<any> {
+    const res = await fetch("/api/pos/purchases/bulk-delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ purchase_ids: ids }),
+    });
+
+    const json = await res.json();
+    if (!res.ok || json?.error) {
+      throw new Error(json?.error || `Failed to delete purchases (${res.status})`);
+    }
+    return json.data;
+  }
 }
 
 export interface PosInventoryRow extends PosInventory {

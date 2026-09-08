@@ -12,12 +12,16 @@ import {
   Receipt,
   RefreshCw,
   ShoppingCart,
+  Trash2,
   TrendingUp,
   Truck,
 } from "lucide-react";
 
 import { NavHeader } from "@/components/pos/nav-header";
 import { InfoTooltip } from "@/components/pos/info-tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { DeleteSalesModal } from "@/components/pos/delete-sales-modal";
 import {
   generatePosReceiptPDF,
   formatPakistanDateTime,
@@ -198,6 +202,33 @@ export default function DashboardPage() {
   const recentSales = useMemo(() => {
     return data?.sales || [];
   }, [data]);
+
+  const [selectedSaleIds, setSelectedSaleIds] = useState<string[]>([]);
+  const [deleteTargetSales, setDeleteTargetSales] = useState<any[]>([]);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  const allSalesSelected =
+    recentSales.length > 0 &&
+    recentSales.every((s: any) => selectedSaleIds.includes(s.id));
+
+  const toggleSelectAllSales = () => {
+    if (allSalesSelected) {
+      const visibleIds = new Set(recentSales.map((s: any) => s.id));
+      setSelectedSaleIds((prev) => prev.filter((id) => !visibleIds.has(id)));
+    } else {
+      const combined = new Set([
+        ...selectedSaleIds,
+        ...recentSales.map((s: any) => s.id),
+      ]);
+      setSelectedSaleIds(Array.from(combined));
+    }
+  };
+
+  const toggleSelectSale = (id: string) => {
+    setSelectedSaleIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
 
   const downloadReceipt = (sale: any) => {
     const items = sale.pos_sale_items || [];
@@ -432,24 +463,71 @@ export default function DashboardPage() {
               </div>
             </summary>
 
+            {selectedSaleIds.length > 0 && (
+              <div className="flex items-center gap-2 p-2.5 mx-4 my-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs justify-between sm:justify-start animate-in fade-in duration-150">
+                <span className="font-semibold text-red-600 dark:text-red-400 px-1">
+                  {selectedSaleIds.length} selected
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedSaleIds([])}
+                  className="h-7 text-xs px-2"
+                >
+                  Clear
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    setDeleteTargetSales(
+                      recentSales.filter((s: any) =>
+                        selectedSaleIds.includes(s.id),
+                      ),
+                    );
+                    setIsDeleteModalOpen(true);
+                  }}
+                  className="h-7 text-xs px-3 bg-red-600 hover:bg-red-700 text-white font-semibold gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete ({selectedSaleIds.length})
+                </Button>
+              </div>
+            )}
+
             <div className="border-t border-[var(--pos-stroke)] overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs text-muted-foreground border-b border-[var(--pos-stroke)]">
+                    <th className="p-3 w-10">
+                      <Checkbox
+                        checked={allSalesSelected}
+                        onCheckedChange={toggleSelectAllSales}
+                        aria-label="Select all recent sales"
+                      />
+                    </th>
                     <th className="p-3">Receipt</th>
                     <th className="p-3">Date</th>
                     <th className="p-3">Customer</th>
                     <th className="p-3 text-right">Total</th>
                     <th className="p-3">Status</th>
-                    <th className="p-3"></th>
+                    <th className="p-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {recentSales.map((sale: any) => (
                     <tr
                       key={sale.id}
-                      className="border-b border-[var(--pos-stroke)] last:border-0"
+                      className="border-b border-[var(--pos-stroke)] last:border-0 hover:bg-foreground/[0.02]"
                     >
+                      <td className="p-3">
+                        <Checkbox
+                          checked={selectedSaleIds.includes(sale.id)}
+                          onCheckedChange={() => toggleSelectSale(sale.id)}
+                          aria-label={`Select sale ${sale.receipt_number}`}
+                        />
+                      </td>
                       <td className="p-3 font-medium">{sale.receipt_number}</td>
                       <td className="p-3 whitespace-nowrap">
                         {sale.sale_date}
@@ -462,20 +540,34 @@ export default function DashboardPage() {
                       </td>
                       <td className="p-3 capitalize">{sale.payment_status}</td>
                       <td className="p-3 text-right">
-                        <button
-                          onClick={() => downloadReceipt(sale)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--pos-stroke)] px-2.5 py-1.5 text-xs hover:bg-foreground/5"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          PDF
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => downloadReceipt(sale)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--pos-stroke)] px-2 py-1 text-xs hover:bg-foreground/5"
+                            title="Download Receipt PDF"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            PDF
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeleteTargetSales([sale]);
+                              setIsDeleteModalOpen(true);
+                            }}
+                            className="p-1 rounded-lg border border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition"
+                            title={`Delete sale ${sale.receipt_number}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                   {recentSales.length === 0 && (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={7}
                         className="p-8 text-center text-muted-foreground"
                       >
                         No sales found for this period.
@@ -488,6 +580,19 @@ export default function DashboardPage() {
           </details>
         </div>
       </div>
+
+      <DeleteSalesModal
+        open={isDeleteModalOpen}
+        onOpenChange={setIsDeleteModalOpen}
+        sales={deleteTargetSales}
+        onSuccess={async () => {
+          setSelectedSaleIds((prev) =>
+            prev.filter((id) => !deleteTargetSales.some((s) => s.id === id)),
+          );
+          setDeleteTargetSales([]);
+          await handleForceRefresh();
+        }}
+      />
     </main>
   );
 }
