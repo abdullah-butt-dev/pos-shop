@@ -233,8 +233,7 @@ export function OrderSummary({
         paidAmount: normalizedAmount,
         remainingAmount: Math.max(subtotal - normalizedAmount, 0),
         paymentStatus: paymentMode,
-        paymentMode:
-          paymentMode.charAt(0).toUpperCase() + paymentMode.slice(1),
+        paymentMode: paymentMode.charAt(0).toUpperCase() + paymentMode.slice(1),
         currency: currentSettings?.currency || "PKR",
       };
 

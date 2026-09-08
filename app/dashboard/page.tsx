@@ -33,8 +33,8 @@ type DashboardData = {
   settings: {
     shop_name?: string;
     currency?: string;
-    shop_address?: string;
-    shop_phone?: string;
+    address?: string;
+    phone?: string;
     receipt_footer_text?: string;
   };
   summary: {
@@ -204,8 +204,8 @@ export default function DashboardPage() {
 
     generatePosReceiptPDF({
       shopName: data?.settings?.shop_name || "Perfect Traders",
-      shopAddress: data?.settings?.shop_address,
-      shopPhone: data?.settings?.shop_phone,
+      shopAddress: data?.settings?.address || "Suraj Miani Road, Multan",
+      shopPhone: data?.settings?.phone || "03134640267",
       receiptFooterText: data?.settings?.receipt_footer_text,
       receiptNumber: sale.receipt_number,
       dateTime: formatPakistanDateTime(sale.created_at),

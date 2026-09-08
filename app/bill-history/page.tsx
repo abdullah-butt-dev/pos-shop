@@ -71,9 +71,9 @@ export default function BillHistoryPage() {
     generatePosReceiptPDF({
       shopName: settings?.shop_name || "Perfect Traders",
 
-      shopAddress: settings?.shop_address,
+      shopAddress: settings?.address || "Suraj Miani Road, Multan",
 
-      shopPhone: settings?.shop_phone,
+      shopPhone: settings?.phone || "03134640267",
 
       receiptFooterText: settings?.receipt_footer_text,
 
