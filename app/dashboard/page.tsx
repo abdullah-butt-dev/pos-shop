@@ -35,6 +35,7 @@ type DashboardData = {
     currency?: string;
     shop_address?: string;
     shop_phone?: string;
+    receipt_footer_text?: string;
   };
   summary: {
     sales: number;
@@ -205,6 +206,7 @@ export default function DashboardPage() {
       shopName: data?.settings?.shop_name || "Perfect Traders",
       shopAddress: data?.settings?.shop_address,
       shopPhone: data?.settings?.shop_phone,
+      receiptFooterText: data?.settings?.receipt_footer_text,
       receiptNumber: sale.receipt_number,
       dateTime: formatPakistanDateTime(sale.created_at),
       customerName: sale.pos_customers?.name || "Walk-in Customer",

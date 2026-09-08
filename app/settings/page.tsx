@@ -28,6 +28,9 @@ import { supabase } from "@/lib/supabase";
 
 type TabType = "business" | "account";
 
+const DEFAULT_RECEIPT_FOOTER =
+  "مال موقع پر چیک کر لیں، بعد میں دکاندار ذمہ دار نہ ہوگا";
+
 type BusinessForm = {
   shop_name: string;
   currency: string;
@@ -35,6 +38,7 @@ type BusinessForm = {
   phone: string;
   invoice_prefix: string;
   tax_rate: string;
+  receipt_footer_text: string;
 };
 
 const emptyBusinessForm: BusinessForm = {
@@ -44,6 +48,7 @@ const emptyBusinessForm: BusinessForm = {
   phone: "",
   invoice_prefix: "PT",
   tax_rate: "0",
+  receipt_footer_text: DEFAULT_RECEIPT_FOOTER,
 };
 
 function toForm(row: PosBusinessSettingsRow): BusinessForm {
@@ -54,6 +59,10 @@ function toForm(row: PosBusinessSettingsRow): BusinessForm {
     phone: row.phone || "",
     invoice_prefix: row.invoice_prefix || "PT",
     tax_rate: String(row.tax_rate ?? 0),
+    receipt_footer_text:
+      row.receipt_footer_text !== undefined && row.receipt_footer_text !== null
+        ? row.receipt_footer_text
+        : DEFAULT_RECEIPT_FOOTER,
   };
 }
 
@@ -112,6 +121,7 @@ export default function SettingsPage() {
         phone: businessForm.phone.trim(),
         invoice_prefix: "PT",
         tax_rate: 0,
+        receipt_footer_text: businessForm.receipt_footer_text.trim(),
       });
       if (updated) setBusinessForm(toForm(updated));
       toast.success("Business settings saved");
@@ -298,6 +308,34 @@ export default function SettingsPage() {
                         className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-[var(--pos-brand)]"
                         rows={2}
                         placeholder="Suraj Miani Road, Multan"
+                      />
+                    </div>
+
+                    <div className="space-y-2 sm:col-span-2">
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor="receipt-footer"
+                          className="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                        >
+                          Receipt Footer Message
+                        </label>
+                        <span className="text-[11px] text-muted-foreground">
+                          Urdu / English printed at bottom of receipt
+                        </span>
+                      </div>
+                      <textarea
+                        id="receipt-footer"
+                        value={businessForm.receipt_footer_text}
+                        onChange={(e) =>
+                          setBusinessForm((f) => ({
+                            ...f,
+                            receipt_footer_text: e.target.value,
+                          }))
+                        }
+                        dir="auto"
+                        className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-[var(--pos-brand)] leading-relaxed"
+                        rows={2}
+                        placeholder={DEFAULT_RECEIPT_FOOTER}
                       />
                     </div>
                   </div>

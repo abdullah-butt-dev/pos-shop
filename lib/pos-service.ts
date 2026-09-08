@@ -386,6 +386,7 @@ export interface PosBusinessSettingsRow {
   phone: string | null;
   invoice_prefix: string;
   tax_rate: number;
+  receipt_footer_text?: string | null;
   updated_at: string;
 }
 

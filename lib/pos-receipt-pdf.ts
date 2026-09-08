@@ -11,6 +11,7 @@ export interface PosReceiptData {
   shopName: string;
   shopAddress?: string;
   shopPhone?: string;
+  receiptFooterText?: string | null;
   receiptNumber: string;
   dateTime: string;
   customerName: string;
@@ -51,12 +52,97 @@ const WIDTH = 80;
 const MARGIN = 5;
 const CONTENT_WIDTH = WIDTH - MARGIN * 2;
 
+interface RenderedFooterImage {
+  dataUrl: string;
+  widthMm: number;
+  heightMm: number;
+}
+
+async function ensureUrduFont(): Promise<void> {
+  if (typeof document === "undefined" || !("fonts" in document)) return;
+
+  try {
+    if (document.fonts.check('16px "Noto Naskh Arabic"')) return;
+
+    const font = new FontFace(
+      "Noto Naskh Arabic",
+      "url(/fonts/NotoNaskhArabic-Regular.woff2)",
+      { style: "normal", weight: "400" },
+    );
+    const loaded = await font.load();
+    document.fonts.add(loaded);
+    await document.fonts.ready;
+  } catch (err) {
+    console.warn("Noto Naskh Arabic font preloading error:", err);
+  }
+}
+
+function renderUrduFooterCanvas(
+  text: string,
+  maxAllowedMmWidth: number,
+): RenderedFooterImage | null {
+  if (typeof document === "undefined") return null;
+
+  try {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    // High resolution scaling: 10 pixels per millimeter (~254 DPI)
+    const scale = 10;
+    const maxPxWidth = maxAllowedMmWidth * scale;
+
+    // Start with a readable font size and shrink in a loop until it fits within maxPxWidth
+    let fontSizePx = 28;
+    const minFontSizePx = 11;
+
+    ctx.font = `${fontSizePx}px "Noto Naskh Arabic", "Noto Nastaliq Urdu", sans-serif`;
+    while (
+      fontSizePx > minFontSizePx &&
+      ctx.measureText(text).width > maxPxWidth
+    ) {
+      fontSizePx -= 1;
+      ctx.font = `${fontSizePx}px "Noto Naskh Arabic", "Noto Nastaliq Urdu", sans-serif`;
+    }
+
+    const metrics = ctx.measureText(text);
+    const textWidthPx = Math.min(metrics.width, maxPxWidth);
+    const canvasHeightPx = Math.ceil(fontSizePx * 1.8);
+    const canvasWidthPx = Math.ceil(textWidthPx + 8);
+
+    canvas.width = canvasWidthPx;
+    canvas.height = canvasHeightPx;
+
+    // Reset context attributes after canvas dimension assignment
+    ctx.font = `${fontSizePx}px "Noto Naskh Arabic", "Noto Nastaliq Urdu", sans-serif`;
+    ctx.direction = "rtl";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#5a5a5a"; // rgb(90, 90, 90) muted receipt text
+
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+    return {
+      dataUrl: canvas.toDataURL("image/png"),
+      widthMm: canvas.width / scale,
+      heightMm: canvas.height / scale,
+    };
+  } catch (err) {
+    console.error("Error rendering Urdu footer to canvas:", err);
+    return null;
+  }
+}
+
 /**
  * Draws the full receipt onto a given jsPDF document and returns the
  * final Y position reached. Used twice: once on a tall "probe" page to
  * measure the required height, then again on a page sized to fit.
  */
-function drawReceipt(doc: jsPDF, receipt: PosReceiptData): number {
+function drawReceipt(
+  doc: jsPDF,
+  receipt: PosReceiptData,
+  footerImg?: RenderedFooterImage | null,
+): number {
   let y = 8;
 
   // --- Shop header ---
@@ -77,61 +163,57 @@ function drawReceipt(doc: jsPDF, receipt: PosReceiptData): number {
   }
 
   if (receipt.shopPhone) {
-    doc.text(receipt.shopPhone, WIDTH / 2, y, { align: "center" });
+    doc.text(`Phone: ${receipt.shopPhone}`, WIDTH / 2, y, { align: "center" });
     y += 4;
   }
 
   doc.setTextColor(0, 0, 0);
-  y += 3;
+  y += 2;
 
-  // --- Receipt # and date, centered and prominent ---
+  // divider
+  doc.setLineWidth(0.4);
+  doc.line(MARGIN, y, WIDTH - MARGIN, y);
+  y += 6;
+
+  // --- Receipt metadata ---
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text(`Receipt# ${receipt.receiptNumber}`, WIDTH / 2, y, {
-    align: "center",
-  });
+  doc.setFontSize(9);
+  doc.text("Receipt #", MARGIN, y);
+  doc.text(receipt.receiptNumber, WIDTH - MARGIN, y, { align: "right" });
   y += 5;
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(90, 90, 90);
-  doc.text(`Date : ${receipt.dateTime}`, WIDTH / 2, y, { align: "center" });
-  doc.setTextColor(0, 0, 0);
+  doc.text("Date", MARGIN, y);
+  doc.text(receipt.dateTime, WIDTH - MARGIN, y, { align: "right" });
   y += 5;
 
-  if (receipt.customerName) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(15, 15, 15);
-    doc.text(`Customer: ${receipt.customerName}`, WIDTH / 2, y, {
-      align: "center",
-    });
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(0, 0, 0);
-    y += 6;
-  } else {
-    y += 2;
-  }
+  doc.text("Customer", MARGIN, y);
+  doc.setFont("helvetica", "bold");
+  doc.text(receipt.customerName, WIDTH - MARGIN, y, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  y += 6;
 
-  // --- Info table: P Mode | I# | U# | Amount ---
+  // divider
+  doc.line(MARGIN, y, WIDTH - MARGIN, y);
+  y += 6;
+
+  // --- Summary strip ---
   const infoColPMode = MARGIN;
-  const infoColI = MARGIN + 30;
-  const infoColU = MARGIN + 44;
+  const infoColI = MARGIN + 28;
+  const infoColU = MARGIN + 40;
   const infoColAmount = WIDTH - MARGIN;
 
-  doc.setFillColor(236, 236, 236);
-  doc.rect(MARGIN - 1, y - 3.6, CONTENT_WIDTH + 2, 6, "F");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
-  doc.text("P Mode", infoColPMode, y);
-  doc.text("I#", infoColI, y, { align: "center" });
-  doc.text("U#", infoColU, y, { align: "center" });
+  doc.setFontSize(8);
+  doc.setTextColor(110, 110, 110);
+  doc.text("P.Mode", infoColPMode, y);
+  doc.text("Items", infoColI, y, { align: "center" });
+  doc.text("Units", infoColU, y, { align: "center" });
   doc.text("Amount", infoColAmount, y, { align: "right" });
   y += 7;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
+  doc.setTextColor(0, 0, 0);
   doc.text(receipt.paymentMode || receipt.paymentStatus || "", infoColPMode, y);
   doc.text(String(receipt.itemCount || 0), infoColI, y, { align: "center" });
   doc.text(String(receipt.unitCount || 0), infoColU, y, { align: "center" });
@@ -148,14 +230,10 @@ function drawReceipt(doc: jsPDF, receipt: PosReceiptData): number {
   const colQty = MARGIN + 46;
   const colTotal = WIDTH - MARGIN;
 
-  // The price column text is right-aligned at colPrice (39mm), extending leftward by
-  // up to ~14-16mm for prices like "Rs1,250.00". To prevent item names from colliding
-  // into the price digits, nameWrapWidth is calculated as the column gap minus the
-  // expected price text width and a safety margin.
-  const colGap = colPrice - colName; // 34mm
-  const maxPriceTextWidth = 14; // Expected width of price text at font size 9 (~13.5mm for "Rs999.00")
-  const priceSafetyMargin = 4; // Safety gap ensuring text never crosses into the Price column
-  const nameWrapWidth = colGap - maxPriceTextWidth - priceSafetyMargin; // 16mm
+  const colGap = colPrice - colName;
+  const maxPriceTextWidth = 14;
+  const priceSafetyMargin = 4;
+  const nameWrapWidth = colGap - maxPriceTextWidth - priceSafetyMargin;
 
   doc.setFillColor(236, 236, 236);
   doc.rect(MARGIN - 1, y - 3.6, CONTENT_WIDTH + 2, 6, "F");
@@ -202,7 +280,6 @@ function drawReceipt(doc: jsPDF, receipt: PosReceiptData): number {
   });
   y += 6;
 
-  // Only show Paid/Remaining when the sale is actually split (partial payment)
   if (receipt.remainingAmount > 0 && receipt.paidAmount > 0) {
     doc.text("Paid", MARGIN, y);
     doc.text(money(receipt.paidAmount, receipt.currency), WIDTH - MARGIN, y, {
@@ -233,24 +310,48 @@ function drawReceipt(doc: jsPDF, receipt: PosReceiptData): number {
   doc.line(MARGIN, y, WIDTH - MARGIN, y);
   y += 6;
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(90, 90, 90);
-  doc.text("Thank you!", WIDTH / 2, y, { align: "center" });
-  y += 4;
+  if (footerImg) {
+    const imgX = (WIDTH - footerImg.widthMm) / 2;
+    doc.addImage(
+      footerImg.dataUrl,
+      "PNG",
+      imgX,
+      y,
+      footerImg.widthMm,
+      footerImg.heightMm,
+    );
+    y += footerImg.heightMm + 4;
+  } else {
+    // Fallback if footer message is empty or canvas unavailable
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(90, 90, 90);
+    doc.text("Thank you!", WIDTH / 2, y, { align: "center" });
+    y += 4;
+  }
 
   return y;
 }
 
-export function generatePosReceiptPDF(receipt: PosReceiptData): void {
+export async function generatePosReceiptPDF(
+  receipt: PosReceiptData,
+): Promise<void> {
+  const footerText = receipt.receiptFooterText?.trim();
+  let footerImg: RenderedFooterImage | null = null;
+
+  if (footerText) {
+    await ensureUrduFont();
+    footerImg = renderUrduFooterCanvas(footerText, CONTENT_WIDTH);
+  }
+
   // Pass 1: draw on a generously tall probe page just to measure the
   // real content height (avoids guessing and leaving blank space).
   const probe = new jsPDF({ unit: "mm", format: [WIDTH, 400] });
-  const finalY = drawReceipt(probe, receipt);
+  const finalY = drawReceipt(probe, receipt, footerImg);
 
   // Pass 2: render for real on a page sized to fit exactly.
   const doc = new jsPDF({ unit: "mm", format: [WIDTH, finalY] });
-  drawReceipt(doc, receipt);
+  drawReceipt(doc, receipt, footerImg);
 
   doc.save(`${receipt.receiptNumber || "receipt"}.pdf`);
 }

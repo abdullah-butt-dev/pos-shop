@@ -75,6 +75,8 @@ export default function BillHistoryPage() {
 
       shopPhone: settings?.shop_phone,
 
+      receiptFooterText: settings?.receipt_footer_text,
+
       receiptNumber: sale.receipt_number,
 
       dateTime: formatPakistanDateTime(sale.created_at),

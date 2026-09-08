@@ -172,6 +172,7 @@ export function OrderSummary({
           shopName: settings?.shop_name || "Perfect Traders",
           shopAddress: settings?.address || "Suraj Miani Road, Multan",
           shopPhone: settings?.phone || "03134640267",
+          receiptFooterText: settings?.receipt_footer_text,
           receiptNumber:
             (saleResult as any)?.receipt_number ||
             `PT-${Date.now().toString().slice(-4)}`,

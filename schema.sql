@@ -186,9 +186,14 @@ CREATE TABLE IF NOT EXISTS pos_business_settings (
   phone                         TEXT,
   invoice_prefix                TEXT NOT NULL DEFAULT 'PT',
   tax_rate                      NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (tax_rate >= 0),
+  receipt_footer_text           TEXT DEFAULT 'مال موقع پر چیک کر لیں، بعد میں دکاندار ذمہ دار نہ ہوگا',
   updated_at                    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT pos_business_settings_singleton CHECK (id)
 );
+
+-- Upgrade column if table already exists
+ALTER TABLE pos_business_settings 
+  ADD COLUMN IF NOT EXISTS receipt_footer_text TEXT DEFAULT 'مال موقع پر چیک کر لیں، بعد میں دکاندار ذمہ دار نہ ہوگا';
 
 INSERT INTO pos_business_settings (id) VALUES (TRUE) ON CONFLICT (id) DO NOTHING;
 
