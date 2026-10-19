@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Banknote,
   LayoutDashboard,
   Package,
   Settings,
@@ -55,6 +56,14 @@ const sectionCards = [
     borderColor: "border-[var(--pos-accent-purple)]/30",
   },
   {
+    icon: Banknote,
+    title: "Expenses",
+    description: "Record rent, meals and other business expenses by month",
+    href: "/expenses",
+    color: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+    borderColor: "border-amber-500/30",
+  },
+  {
     icon: Settings,
     title: "Settings",
     description: "Shop info, theme and account settings",
@@ -95,7 +104,7 @@ export default function HomePage() {
             </div>
           </Link>
 
-          {/* 6 Section Cards */}
+          {/* Section Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {sectionCards.map((card) => (
               <Link

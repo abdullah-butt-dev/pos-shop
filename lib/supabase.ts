@@ -125,10 +125,15 @@ export interface PosSale {
   customer_id: string | null;
   sale_date: string;
   notes: string | null;
+  /** Items subtotal - discount_amount + delivery_charge (previous_balance is NOT included). */
   total_amount: number;
   amount_paid: number;
   amount_due: number;
   payment_status: PosPaymentStatus;
+  discount_amount: number;
+  delivery_charge: number;
+  /** Customer's outstanding balance at the moment this sale was made (bill display only). */
+  previous_balance: number;
   created_at: string;
   updated_at: string;
 }
@@ -165,5 +170,15 @@ export interface PosBusinessSettings {
   invoice_prefix: string;
   tax_rate: number;
   receipt_footer_text?: string | null;
+  updated_at: string;
+}
+
+export interface PosExpense {
+  id: string;
+  category: string;
+  amount: number;
+  expense_date: string;
+  notes: string | null;
+  created_at: string;
   updated_at: string;
 }

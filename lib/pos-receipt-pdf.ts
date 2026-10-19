@@ -18,12 +18,45 @@ export interface PosReceiptData {
   items: PosReceiptItem[];
   itemCount?: number;
   unitCount?: number;
+  /** Total of THIS sale: subtotal - discount + delivery (previous balance not included). */
   grandTotal: number;
+  /** Items subtotal before discount / delivery. Defaults to grandTotal. */
+  subtotal?: number;
+  discountAmount?: number;
+  deliveryCharge?: number;
+  /** Customer's outstanding balance before this sale. */
+  previousBalance?: number;
   paidAmount: number;
+  /** Still owed on THIS sale (previous balance is added on the bill). */
   remainingAmount: number;
   paymentStatus: string;
   paymentMode?: string;
   currency?: string;
+}
+
+/**
+ * Builds the bill breakdown fields (subtotal, discount, delivery, previous
+ * balance) from a saved sale row. Older sales that pre-date discounts /
+ * delivery charges simply produce zeros, so their bills stay unchanged.
+ */
+export function getSaleReceiptCharges(sale: any): {
+  subtotal: number;
+  discountAmount: number;
+  deliveryCharge: number;
+  previousBalance: number;
+} {
+  const items: any[] = sale?.pos_sale_items || [];
+  const itemsTotal = items.reduce(
+    (sum, item) => sum + Number(item?.line_total || 0),
+    0,
+  );
+
+  return {
+    subtotal: items.length > 0 ? itemsTotal : Number(sale?.total_amount || 0),
+    discountAmount: Number(sale?.discount_amount || 0),
+    deliveryCharge: Number(sale?.delivery_charge || 0),
+    previousBalance: Number(sale?.previous_balance || 0),
+  };
 }
 
 export function formatPakistanDateTime(
@@ -291,38 +324,58 @@ function drawReceipt(
   y += 6;
 
   // --- Totals ---
+  // Order: Previous Balance, Subtotal, Discount / Delivery, Grand Total
+  const previousBalance = Number(receipt.previousBalance || 0);
+  const subtotal = Number(receipt.subtotal ?? receipt.grandTotal ?? 0);
+  const discount = Number(receipt.discountAmount || 0);
+  const delivery = Number(receipt.deliveryCharge || 0);
+  const billGrandTotal = previousBalance + Number(receipt.grandTotal || 0);
+  const balanceDue = previousBalance + Number(receipt.remainingAmount || 0);
+
+  const row = (label: string, value: string) => {
+    doc.text(label, MARGIN, y);
+    doc.text(value, WIDTH - MARGIN, y, { align: "right" });
+    y += 6;
+  };
+
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text("Subtotal", MARGIN, y);
-  doc.text(money(receipt.grandTotal, receipt.currency), WIDTH - MARGIN, y, {
-    align: "right",
-  });
-  y += 6;
 
-  if (receipt.remainingAmount > 0 && receipt.paidAmount > 0) {
-    doc.text("Paid", MARGIN, y);
-    doc.text(money(receipt.paidAmount, receipt.currency), WIDTH - MARGIN, y, {
-      align: "right",
-    });
-    y += 6;
+  row("Previous Balance", money(previousBalance, receipt.currency));
+  row("Subtotal", money(subtotal, receipt.currency));
+  row(
+    "Discount",
+    discount > 0
+      ? `-${money(discount, receipt.currency)}`
+      : money(0, receipt.currency),
+  );
+  row(
+    "Delivery Charges",
+    delivery > 0
+      ? `+${money(delivery, receipt.currency)}`
+      : money(0, receipt.currency),
+  );
 
-    doc.text("Remaining", MARGIN, y);
-    doc.text(
-      money(receipt.remainingAmount, receipt.currency),
-      WIDTH - MARGIN,
-      y,
-      { align: "right" },
-    );
-    y += 6;
-  }
+  doc.setLineWidth(0.2);
+  doc.line(MARGIN, y - 3.5, WIDTH - MARGIN, y - 3.5);
+  y += 1;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.text("Grand Total", MARGIN, y);
-  doc.text(money(receipt.grandTotal, receipt.currency), WIDTH - MARGIN, y, {
+  doc.text(money(billGrandTotal, receipt.currency), WIDTH - MARGIN, y, {
     align: "right",
   });
-  y += 8;
+  y += 7;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  row("Paid", money(receipt.paidAmount, receipt.currency));
+
+  doc.setFont("helvetica", "bold");
+  row("Balance Due", money(balanceDue, receipt.currency));
+  doc.setFont("helvetica", "normal");
+  y += 2;
 
   doc.setDrawColor(200, 200, 200);
   doc.setLineWidth(0.2);

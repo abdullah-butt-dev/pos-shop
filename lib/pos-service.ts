@@ -6,6 +6,7 @@ import type {
   PosSale,
   PosSaleItem,
   PosCustomerPayment,
+  PosExpense,
 } from "./supabase";
 
 // ----------------------------------------------------------------------
@@ -258,6 +259,27 @@ export class PosSupplierService {
 export class PosCustomerService {
   static search(query: string): Promise<PosAutocompleteOption[]> {
     return searchByName("/api/pos/customers", query);
+  }
+
+  /** Customer's total outstanding balance across all open sales (0 if none). */
+  static async getBalance(customerId: string): Promise<number> {
+    try {
+      const res = await fetch(
+        `/api/pos/customers/${encodeURIComponent(customerId)}/balance?t=${Date.now()}`,
+        { cache: "no-store" },
+      );
+      const json = await res.json();
+
+      if (!res.ok || json.error) {
+        console.error("Error fetching customer balance:", json.error);
+        return 0;
+      }
+
+      return Number(json.data?.balance) || 0;
+    } catch (error) {
+      console.error("Error in PosCustomerService.getBalance:", error);
+      return 0;
+    }
   }
 
   static create(name: string): Promise<PosAutocompleteOption | null> {
@@ -568,6 +590,10 @@ export interface PosCreateSaleInput {
   customer_id: string | null;
   items: PosCreateSaleItemInput[];
   paid_amount: number;
+  /** Special discount subtracted from the items subtotal. */
+  discount_amount?: number;
+  /** Delivery charge added to the sale total. */
+  delivery_charge?: number;
 }
 
 export class PosSaleService {
@@ -737,5 +763,88 @@ export class PosCustomerPaymentService {
       throw new Error(msg);
     }
     return json.data;
+  }
+}
+
+// ----------------------------------------------------------------------
+// Expenses
+// ----------------------------------------------------------------------
+
+export interface PosExpenseInput {
+  category: string;
+  amount: number;
+  expense_date: string;
+  notes?: string | null;
+}
+
+/** Quick-pick categories shown on the Expenses page (any custom text is also allowed). */
+export const POS_EXPENSE_CATEGORIES = [
+  "Rent",
+  "Food / Meals",
+  "Salaries",
+  "Electricity",
+  "Transport",
+  "Delivery",
+  "Maintenance",
+  "Other",
+] as const;
+
+async function parseExpenseResponse(res: Response, fallback: string) {
+  const text = await res.text();
+  let json: any = null;
+
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(text || `${fallback} (${res.status})`);
+  }
+
+  if (!res.ok || json?.error) {
+    throw new Error(json?.error || `${fallback} (${res.status})`);
+  }
+
+  return json;
+}
+
+export class PosExpenseService {
+  static async list(from?: string, to?: string): Promise<PosExpense[]> {
+    const params = new URLSearchParams();
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    params.set("t", String(Date.now()));
+
+    const res = await fetch(`/api/pos/expenses?${params.toString()}`, {
+      cache: "no-store",
+    });
+    const json = await parseExpenseResponse(res, "Failed to load expenses");
+
+    return json.data || [];
+  }
+
+  static async create(input: PosExpenseInput): Promise<PosExpense> {
+    const res = await fetch("/api/pos/expenses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const json = await parseExpenseResponse(res, "Failed to save expense");
+
+    return json.data;
+  }
+
+  static async update(id: string, input: PosExpenseInput): Promise<PosExpense> {
+    const res = await fetch(`/api/pos/expenses/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const json = await parseExpenseResponse(res, "Failed to update expense");
+
+    return json.data;
+  }
+
+  static async delete(id: string): Promise<void> {
+    const res = await fetch(`/api/pos/expenses/${id}`, { method: "DELETE" });
+    await parseExpenseResponse(res, "Failed to delete expense");
   }
 }

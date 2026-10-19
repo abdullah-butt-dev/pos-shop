@@ -45,11 +45,12 @@ export async function GET(request: Request) {
       supplierPaymentsResult,
       inventoryResult,
       settingsResult,
+      expensesResult,
     ] = await Promise.all([
       supabase
         .from("pos_sales")
         .select(
-          "id, receipt_number, customer_id, sale_date, total_amount, amount_paid, amount_due, payment_status, created_at, pos_customers(name), pos_sale_items(id, product_id, quantity, unit_price, unit_cost, line_total, line_cost_total, pos_products(name))",
+          "id, receipt_number, customer_id, sale_date, total_amount, amount_paid, amount_due, payment_status, discount_amount, delivery_charge, previous_balance, created_at, pos_customers(name), pos_sale_items(id, product_id, quantity, unit_price, unit_cost, line_total, line_cost_total, pos_products(name))",
         )
         .or(
           `and(sale_date.gte.${from},sale_date.lte.${to}),and(created_at.gte.${fromStart},created_at.lte.${toEnd})`,
@@ -97,6 +98,12 @@ export async function GET(request: Request) {
         .select("*")
         .eq("id", true)
         .maybeSingle(),
+
+      supabase
+        .from("pos_expenses")
+        .select("id, category, amount, expense_date")
+        .gte("expense_date", from)
+        .lte("expense_date", to),
     ]);
 
     const firstError = [
@@ -113,6 +120,16 @@ export async function GET(request: Request) {
 
       return NextResponse.json({ error: firstError.message }, { status: 500 });
     }
+
+    // Expenses are optional: if the pos_expenses table has not been created yet
+    // (migration not run) the dashboard keeps working and shows 0 expenses.
+    if (expensesResult.error) {
+      console.warn(
+        "[API /api/pos/reports] Expenses unavailable:",
+        expensesResult.error.message,
+      );
+    }
+    const expenses = expensesResult.error ? [] : expensesResult.data || [];
 
     const sales = salesResult.data || [];
     const purchases = purchasesResult.data || [];
@@ -179,10 +196,10 @@ export async function GET(request: Request) {
 
     // Revenue and profit are recognized on the original sale date. Customer payments are cash collections only and must never be counted as revenue or profit again.
     const salesWithProfit = sales.map((sale: any) => {
-      const revenue = (sale.pos_sale_items || []).reduce(
-        (sum: number, item: any) => sum + Number(item.line_total || 0),
-        0,
-      );
+      // total_amount = items - discount + delivery, so discounts reduce profit and
+      // delivery charges count as revenue. For older sales (no discount/delivery)
+      // this equals the sum of the item totals, exactly as before.
+      const revenue = Number(sale.total_amount || 0);
 
       const cost = (sale.pos_sale_items || []).reduce(
         (sum: number, item: any) => sum + Number(item.line_cost_total || 0),
@@ -245,6 +262,11 @@ export async function GET(request: Request) {
       0,
     );
 
+    const expensesTotal = expenses.reduce(
+      (sum: number, expense: any) => sum + Number(expense.amount || 0),
+      0,
+    );
+
     const purchaseTotal = purchases.reduce(
       (sum, purchase: any) => sum + Number(purchase.total_amount || 0),
       0,
@@ -275,6 +297,9 @@ export async function GET(request: Request) {
         summary: {
           sales: salesTotal,
           profit: profitTotal,
+          gross_profit: profitTotal,
+          expenses: expensesTotal,
+          net_profit: profitTotal - expensesTotal,
           purchases: purchaseTotal,
           customer_payments: customerPaymentTotal,
           supplier_payments: supplierPaymentTotal,

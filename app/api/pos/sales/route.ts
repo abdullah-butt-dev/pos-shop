@@ -64,6 +64,36 @@ export async function POST(request: Request) {
       );
     }
 
+    const discountRaw =
+      body?.discount_amount === undefined ||
+      body?.discount_amount === null ||
+      body?.discount_amount === ""
+        ? 0
+        : Number(body.discount_amount);
+    const deliveryRaw =
+      body?.delivery_charge === undefined ||
+      body?.delivery_charge === null ||
+      body?.delivery_charge === ""
+        ? 0
+        : Number(body.delivery_charge);
+
+    if (!Number.isFinite(discountRaw) || discountRaw < 0) {
+      return NextResponse.json(
+        { error: "Discount must be zero or greater" },
+        { status: 400 },
+      );
+    }
+
+    if (!Number.isFinite(deliveryRaw) || deliveryRaw < 0) {
+      return NextResponse.json(
+        { error: "Delivery charge must be zero or greater" },
+        { status: 400 },
+      );
+    }
+
+    const discountAmount = Math.round(discountRaw * 100) / 100;
+    const deliveryCharge = Math.round(deliveryRaw * 100) / 100;
+
     const normalizedItems = items.map((item: any) => ({
       product_id: String(item?.product_id || ""),
       quantity: Number(item?.quantity),
@@ -141,39 +171,33 @@ export async function POST(request: Request) {
         ? String(body.sale_date)
         : getPakistanDate();
 
-    // Call pos_create_sale with p_sale_date (or fallback to 3-param if DB has not yet applied 4-param)
-    let { data, error } = await supabaseAdmin.rpc("pos_create_sale", {
+    // pos_create_sale_v2 creates the sale, items, FIFO cost allocation, discount,
+    // delivery charge, previous-balance snapshot and initial payment in ONE
+    // database transaction (installed by migration-001-expenses-discounts.sql).
+    const { data, error } = await supabaseAdmin.rpc("pos_create_sale_v2", {
       p_customer_id: customerId,
       p_items: normalizedItems,
       p_paid_amount: paidAmount,
       p_sale_date: saleDate,
+      p_discount_amount: discountAmount,
+      p_delivery_charge: deliveryCharge,
     });
 
     if (
       error &&
       (error.code === "PGRST202" ||
         error.message?.toLowerCase().includes("schema cache") ||
-        error.message?.toLowerCase().includes("could not find the function") ||
-        error.message?.toLowerCase().includes("does not exist"))
+        error.message?.toLowerCase().includes("could not find the function"))
     ) {
-      console.warn(
-        "[API /api/pos/sales] 4-parameter pos_create_sale not found, falling back to 3-parameter",
-      );
-      const retry = await supabaseAdmin.rpc("pos_create_sale", {
-        p_customer_id: customerId,
-        p_items: normalizedItems,
-        p_paid_amount: paidAmount,
-      });
-      data = retry.data;
-      error = retry.error;
+      console.error("[API /api/pos/sales] pos_create_sale_v2 not found:", error);
 
-      // If 3-param succeeded, ensure the sale has the merchant's Pakistan local date
-      if (!error && data) {
-        await supabaseAdmin
-          .from("pos_sales")
-          .update({ sale_date: saleDate })
-          .eq("id", data);
-      }
+      return NextResponse.json(
+        {
+          error:
+            "Database update required: run migration-001-expenses-discounts.sql in the Supabase SQL Editor, then try again.",
+        },
+        { status: 500 },
+      );
     }
 
     if (error) {
@@ -208,7 +232,7 @@ export async function POST(request: Request) {
     const { data: createdSale } = await supabaseAdmin
       .from("pos_sales")
       .select(
-        "id, receipt_number, sale_date, total_amount, amount_paid, amount_due, payment_status, created_at",
+        "id, receipt_number, sale_date, total_amount, amount_paid, amount_due, payment_status, discount_amount, delivery_charge, previous_balance, created_at",
       )
       .eq("id", data)
       .maybeSingle();

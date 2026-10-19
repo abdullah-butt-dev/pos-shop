@@ -8,7 +8,7 @@ A fast, responsive, and robust Point of Sale system built with Next.js 14 App Ro
 
 ### 1. 📊 Dashboard (`/dashboard`)
 
-- **Real-time Business Financials**: Key performance indicators including Total Sales Revenue, Estimated Profit, Cash Inflow (customer collections), and Cash Outflow (supplier disbursements).
+- **Real-time Business Financials**: Key performance indicators including Sales, Purchases, **Gross Profit**, **Total Expenses** and **Net Profit** (Gross Profit − Expenses), all following the selected date range (Today / Yesterday / This Week / This Month / Custom).
 - **Outstanding Balances**: Live Customer Receivables and Supplier Payables tracking.
 - **Catalog Health**: Total active products count.
 - **Recent Sales Audit**: View chronological customer sales with receipt number, customer, line item counts, total amount, payment status, and instant on-demand PDF receipt downloads.
@@ -17,11 +17,15 @@ A fast, responsive, and robust Point of Sale system built with Next.js 14 App Ro
 
 - **Fast-Paced Register Interface**: Clean grid view of active inventory with responsive layout and live stock indicators.
 - **Customer Search & Creation**: Autocomplete lookup for existing customers with inline instant customer addition.
+- **Previous Balance**: As soon as a customer is selected, the cart shows their outstanding balance from earlier credit/partial sales.
+- **Discount & Delivery Charges**: Optional inputs in the cart. Discount reduces the sale, delivery charge is added to it. The discount can never exceed the sale amount.
+- **Bill Breakdown**: Cart and printed bill show, in order: Previous Balance → Subtotal → Discount → Delivery Charges → **Grand Total** (previous balance + this sale), followed by Paid and Balance Due.
 - **Flexible Payment Handling**:
   - **Paid**: Full payment collected upfront.
   - **Credit**: Zero payment collected upfront; balance added to customer receivables.
   - **Partial**: Split payment; specify cash collected with remaining balance added to customer receivables.
-- **On-the-Fly PDF Receipts**: Direct client-side receipt generation and download using `jsPDF` without storing files or consuming database storage quotas.
+  - The amount paid at checkout settles *this* sale. Old balances are collected from the Receivables page.
+- **On-the-Fly PDF Receipts**: Direct client-side receipt generation and download using `jsPDF` without storing files or consuming database storage quotas. Reprinting an older bill from the Dashboard or Bill History uses the values saved with that sale.
 
 ### 3. 📦 Purchases (`/purchases`)
 
@@ -49,7 +53,14 @@ A fast, responsive, and robust Point of Sale system built with Next.js 14 App Ro
 - **Cash Collections**: Record customer payments against open sales invoices with built-in overpayment prevention.
 - **Payment Management**: View and edit collection records with real-time recalculation of remaining customer balances.
 
-### 7. ⚙️ Settings (`/settings`)
+### 7. 💸 Expenses (`/expenses`)
+
+- **Record Expenses**: Log each business expense with a **category** (quick-pick Rent, Food / Meals, Salaries, Electricity, Transport, Delivery, Maintenance, Other — or any custom text), **amount**, **date** and optional note.
+- **Monthly Tracking**: Switch months with the arrows or month picker; see the month total, number of entries, biggest category and a per-category breakdown.
+- **Edit & Delete**: Fix a mistake or remove an entry; the dashboard updates accordingly.
+- **Feeds the Dashboard**: Expenses in the selected date range are subtracted from Gross Profit to give Net Profit.
+
+### 8. ⚙️ Settings (`/settings`)
 
 - **Shop Identity & Invoicing**: Configure Shop Name, Currency symbol, Business Address, Phone Number, and Invoice Prefix.
 - **Tax Configuration**: Set system-wide tax percentage.
@@ -61,9 +72,11 @@ A fast, responsive, and robust Point of Sale system built with Next.js 14 App Ro
 
 - **Single Source of Truth**: Financial totals, stock balances, and payment statuses are calculated and maintained directly at the database layer using PostgreSQL triggers and functions:
   - `pos_adjust_inventory`: Adjusts stock and logs inventory movements on purchase and sale events.
-  - `pos_recalc_sale` & `pos_recalc_purchase`: Automatically compute line totals, amounts paid, amounts due, and payment statuses (`paid`, `partial`, `credit`/`unpaid`).
-  - `pos_create_sale` & `pos_create_purchase`: Atomic stored procedures enforcing stock availability and FIFO cost allocation.
+  - `pos_recalc_sale` & `pos_recalc_purchase`: Automatically compute line totals, amounts paid, amounts due, and payment statuses (`paid`, `partial`, `credit`/`unpaid`). A sale's `total_amount` = items − `discount_amount` + `delivery_charge`.
+  - `pos_create_sale_v2` & `pos_create_purchase`: Atomic stored procedures enforcing stock availability and FIFO cost allocation. `pos_create_sale_v2` also stores the discount, delivery charge and a snapshot of the customer's previous balance. The original `pos_create_sale` is kept for backward compatibility.
 - **Revenue Recognition Rule**: Revenue and profit are recognized immediately on the original sale date (regardless of whether paid in cash, partial, or on credit). Customer payments are cash collections only; they reduce receivables and are reported as Cash Inflow, never double-counted as revenue or profit.
+- **Profit Rules**: Revenue = sale total after discount, including delivery charges. **Gross Profit** = revenue − FIFO cost of goods sold. **Net Profit** = Gross Profit − Expenses. Previous balance is never counted as revenue (it was already counted when that earlier sale was made).
+- **Database Tables** (all prefixed `pos_`): products, suppliers, customers, purchases, purchase_items, inventory, inventory_movements, supplier_payments, sales, sale_items, sale_cost_allocations, customer_payments, business_settings, **expenses**.
 - **Zero Storage Bucket Consumption**: Receipts are generated client-side on demand using `jsPDF`. No binary files are stored in Supabase storage buckets, keeping storage usage within free-tier limits.
 
 ---
@@ -105,13 +118,19 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-### 3. Deploy Database Schema
+### 3. Set Up the Database
 
-Execute `schema.sql` in your Supabase SQL Editor:
+**New project (empty database):** run `schema.sql` in the Supabase SQL Editor. It already includes everything below.
 
-1. Open the Supabase dashboard and navigate to **SQL Editor**.
-2. Copy and paste the contents of `schema.sql`.
-3. Run the query to create tables, triggers, indexes, and initial settings.
+**Existing project with live data (upgrading):** do **not** re-run `schema.sql`. Run only the migration:
+
+1. Open the Supabase dashboard → **SQL Editor** → **New query**.
+2. Paste the contents of `migration-001-expenses-discounts.sql` and click **Run**.
+3. Do this **before** deploying or starting the updated app.
+
+The migration is additive and safe to re-run: it adds three columns to `pos_sales` (discount, delivery charge, previous balance — all default to 0, so every existing sale stays identical), creates the `pos_expenses` table, replaces `pos_recalc_sale` (same results when discount and delivery are 0) and adds `pos_create_sale_v2`. It does not drop, delete or rewrite any existing data. Existing bills reprint with Discount / Delivery / Previous Balance at Rs 0.
+
+Optional check: `SELECT count(*), sum(total_amount) FROM pos_sales;` before and after — the numbers must match.
 
 ### 4. Run Development Server
 
@@ -129,3 +148,11 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - `npm run build`: Compiles and builds the production application.
 - `npm run start`: Runs the production build.
 - `npm run lint`: Checks for linting errors.
+
+---
+
+## 📁 Database Files
+
+- `schema.sql`: Full schema for a **fresh** database (includes migration 001).
+- `migration-001-expenses-discounts.sql`: Upgrade script for an **existing** database — expenses, discounts, delivery charges, previous balance.
+- `run-in-supabase.sql`: Earlier patch for the delete functions.

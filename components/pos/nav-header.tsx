@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   ArrowLeft,
+  Banknote,
   Home,
   LayoutDashboard,
   LogOut,
@@ -34,6 +35,7 @@ const navItems = [
   { icon: Package, label: "Products & Suppliers", href: "/inventory" },
   { icon: Wallet, label: "Payables", href: "/payables" },
   { icon: Users, label: "Receivables", href: "/receivables" },
+  { icon: Banknote, label: "Expenses", href: "/expenses" },
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
 

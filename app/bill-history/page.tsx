@@ -18,6 +18,7 @@ import { DeleteSalesModal } from "@/components/pos/delete-sales-modal";
 import {
   downloadPosReceiptPDF,
   formatPakistanDateTime,
+  getSaleReceiptCharges,
 } from "@/lib/pos-receipt-pdf";
 
 export default function BillHistoryPage() {
@@ -114,6 +115,8 @@ export default function BillHistoryPage() {
         (sum: number, item: any) => sum + Number(item.quantity || 0),
         0,
       ),
+
+      ...getSaleReceiptCharges(sale),
 
       grandTotal: Number(sale.total_amount),
 

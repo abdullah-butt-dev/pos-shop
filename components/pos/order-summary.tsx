@@ -42,6 +42,15 @@ import {
 
 type PaymentMode = "paid" | "credit" | "partial";
 
+const round2 = (value: number) =>
+  Math.round((value + Number.EPSILON) * 100) / 100;
+
+// Blank / invalid / negative input counts as 0
+const parseMoney = (value: string) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? round2(parsed) : 0;
+};
+
 export function OrderSummary({
   refetchData,
 }: {
@@ -56,6 +65,12 @@ export function OrderSummary({
 
   const [paidAmount, setPaidAmount] = useState("");
 
+  const [discountInput, setDiscountInput] = useState("");
+  const [deliveryInput, setDeliveryInput] = useState("");
+
+  const [previousBalance, setPreviousBalance] = useState(0);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -68,9 +83,42 @@ export function OrderSummary({
       .catch(() => {});
   }, []);
 
+  // Show the customer's outstanding balance as soon as a customer is selected
+  useEffect(() => {
+    if (!customer?.id) {
+      setPreviousBalance(0);
+      setBalanceLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setBalanceLoading(true);
+
+    PosCustomerService.getBalance(customer.id)
+      .then((balance) => {
+        if (!cancelled) setPreviousBalance(balance);
+      })
+      .finally(() => {
+        if (!cancelled) setBalanceLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [customer?.id]);
+
+  // Bill maths:
+  //   saleTotal  = subtotal - discount + delivery   (what THIS sale costs)
+  //   grandTotal = previous balance + saleTotal     (what the customer owes in total)
+  const discountValue = parseMoney(discountInput);
+  const deliveryValue = parseMoney(deliveryInput);
+  const discountTooHigh = discountValue > round2(subtotal + deliveryValue) + 0.009;
+  const saleTotal = round2(Math.max(subtotal - discountValue + deliveryValue, 0));
+  const grandTotal = round2(previousBalance + saleTotal);
+
   useEffect(() => {
     if (paymentMode === "paid") {
-      setPaidAmount(subtotal > 0 ? subtotal.toFixed(2) : "");
+      setPaidAmount(saleTotal > 0 ? saleTotal.toFixed(2) : "");
       return;
     }
 
@@ -81,20 +129,20 @@ export function OrderSummary({
 
     const current = Number(paidAmount);
 
-    if (!Number.isFinite(current) || current <= 0 || current >= subtotal) {
+    if (!Number.isFinite(current) || current <= 0 || current >= saleTotal) {
       setPaidAmount("");
     }
-  }, [subtotal, paymentMode]);
+  }, [saleTotal, paymentMode]);
 
   const numericPaidAmount = Number(paidAmount);
   const remaining =
-    subtotal - (Number.isFinite(numericPaidAmount) ? numericPaidAmount : 0);
+    saleTotal - (Number.isFinite(numericPaidAmount) ? numericPaidAmount : 0);
 
   const selectPaymentMode = (mode: PaymentMode) => {
     setPaymentMode(mode);
 
     if (mode === "paid") {
-      setPaidAmount(subtotal > 0 ? subtotal.toFixed(2) : "");
+      setPaidAmount(saleTotal > 0 ? saleTotal.toFixed(2) : "");
     } else if (mode === "credit") {
       setPaidAmount("0");
     } else {
@@ -113,7 +161,7 @@ export function OrderSummary({
 
     if (amount === 0) {
       setPaymentMode("credit");
-    } else if (amount >= subtotal) {
+    } else if (amount >= saleTotal) {
       setPaymentMode("paid");
     } else {
       setPaymentMode("partial");
@@ -138,6 +186,16 @@ export function OrderSummary({
       }
     }
 
+    if (discountTooHigh) {
+      toast.error("Discount cannot be more than the sale amount");
+      return;
+    }
+
+    if (saleTotal <= 0) {
+      toast.error("Sale total must be greater than zero");
+      return;
+    }
+
     const amount = Number(paidAmount);
 
     if (!Number.isFinite(amount) || amount < 0) {
@@ -145,15 +203,15 @@ export function OrderSummary({
       return;
     }
 
-    if (amount > subtotal + 0.009) {
+    if (amount > saleTotal + 0.009) {
       toast.error("Paid amount cannot be greater than the sale total");
       return;
     }
 
     const normalizedAmount =
-      Math.abs(amount - subtotal) <= 0.009 ? subtotal : amount;
+      Math.abs(amount - saleTotal) <= 0.009 ? saleTotal : amount;
 
-    const isOutstanding = subtotal - normalizedAmount > 0.009;
+    const isOutstanding = saleTotal - normalizedAmount > 0.009;
 
     if (isOutstanding && !customer) {
       toast.error("Select a customer for credit or partial payment");
@@ -169,12 +227,14 @@ export function OrderSummary({
 
     const amount = Number(paidAmount);
     const normalizedAmount =
-      Math.abs(amount - subtotal) <= 0.009 ? subtotal : amount;
+      Math.abs(amount - saleTotal) <= 0.009 ? saleTotal : amount;
 
     try {
       const saleResult = await PosSaleService.create({
         customer_id: customer?.id ?? null,
         paid_amount: normalizedAmount,
+        discount_amount: discountValue,
+        delivery_charge: deliveryValue,
         items: items.map((item) => ({
           product_id: item.id,
           quantity: item.qty,
@@ -184,6 +244,14 @@ export function OrderSummary({
 
       const currentSettings =
         settings || (await PosSettingsService.get().catch(() => null));
+
+      // Prefer the values the database actually saved (previous balance is a
+      // snapshot taken inside the sale transaction); fall back to the cart values.
+      const saved = saleResult as any;
+      const billPreviousBalance = Number(saved?.previous_balance ?? previousBalance) || 0;
+      const billDiscount = Number(saved?.discount_amount ?? discountValue) || 0;
+      const billDelivery = Number(saved?.delivery_charge ?? deliveryValue) || 0;
+      const billSaleTotal = Number(saved?.total_amount ?? saleTotal) || 0;
 
       const receiptData: PosReceiptData = {
         shopName: currentSettings?.shop_name || "Perfect Traders",
@@ -203,9 +271,13 @@ export function OrderSummary({
         })),
         itemCount: items.length,
         unitCount: items.reduce((sum, i) => sum + i.qty, 0),
-        grandTotal: subtotal,
+        subtotal,
+        discountAmount: billDiscount,
+        deliveryCharge: billDelivery,
+        previousBalance: billPreviousBalance,
+        grandTotal: billSaleTotal,
         paidAmount: normalizedAmount,
-        remainingAmount: Math.max(subtotal - normalizedAmount, 0),
+        remainingAmount: Math.max(billSaleTotal - normalizedAmount, 0),
         paymentStatus: paymentMode,
         paymentMode: paymentMode.charAt(0).toUpperCase() + paymentMode.slice(1),
         currency: currentSettings?.currency || "PKR",
@@ -222,6 +294,8 @@ export function OrderSummary({
       setCustomer(null);
       setPaymentMode("paid");
       setPaidAmount("");
+      setDiscountInput("");
+      setDeliveryInput("");
 
       await refetchData?.();
 
@@ -393,13 +467,119 @@ export function OrderSummary({
 
           <div className="shrink-0 space-y-4 pt-2 border-t border-[var(--pos-stroke)]">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="space-y-2 text-sm">
+                {customer && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">
+                      Previous Balance
+                    </span>
+
+                    <span
+                      className={
+                        previousBalance > 0.009
+                          ? "font-semibold text-amber-500"
+                          : "font-semibold text-muted-foreground"
+                      }
+                    >
+                      {balanceLoading
+                        ? "Checking..."
+                        : `Rs. ${previousBalance.toFixed(2)}`}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Subtotal</span>
+
+                  <span className="font-semibold">
+                    Rs. {subtotal.toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-xs text-muted-foreground">
+                    Discount
+                    <div className="relative mt-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs">
+                        Rs.
+                      </span>
+
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        placeholder="0"
+                        value={discountInput}
+                        onChange={(event) =>
+                          setDiscountInput(event.target.value)
+                        }
+                        onFocus={(e) => e.target.select()}
+                        className="w-full bg-foreground/5 border border-foreground/10 rounded-lg pl-9 pr-2 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand"
+                        aria-label="Discount"
+                      />
+                    </div>
+                  </label>
+
+                  <label className="text-xs text-muted-foreground">
+                    Delivery charges
+                    <div className="relative mt-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs">
+                        Rs.
+                      </span>
+
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        placeholder="0"
+                        value={deliveryInput}
+                        onChange={(event) =>
+                          setDeliveryInput(event.target.value)
+                        }
+                        onFocus={(e) => e.target.select()}
+                        className="w-full bg-foreground/5 border border-foreground/10 rounded-lg pl-9 pr-2 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-pos-brand"
+                        aria-label="Delivery charges"
+                      />
+                    </div>
+                  </label>
+                </div>
+
+                {discountTooHigh && (
+                  <p className="text-xs text-red-500 font-medium">
+                    Discount cannot be more than the sale amount.
+                  </p>
+                )}
+
+                {(discountValue > 0 || deliveryValue > 0) && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      This sale (after discount / delivery)
+                    </span>
+
+                    <span className="font-semibold">
+                      Rs. {saleTotal.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-1 border-t border-[var(--pos-stroke)]">
                 <span className="font-medium text-sm">Grand Total</span>
 
                 <span className="text-2xl font-bold text-[var(--pos-brand-text)]">
-                  Rs. {subtotal.toFixed(2)}
+                  Rs. {grandTotal.toFixed(2)}
                 </span>
               </div>
+
+              {previousBalance > 0.009 && (
+                <p className="text-[11px] text-muted-foreground -mt-2">
+                  Includes previous balance of Rs. {previousBalance.toFixed(2)}.
+                  The payment below is for this sale; collect old balances in
+                  Receivables.
+                </p>
+              )}
 
               <div>
                 <div className="flex items-center justify-between">
@@ -470,7 +650,7 @@ export function OrderSummary({
                       id="pos-paid-amount"
                       type="number"
                       min="0"
-                      max={subtotal}
+                      max={saleTotal}
                       step="0.01"
                       value={paidAmount}
                       onChange={(event) =>
@@ -498,6 +678,18 @@ export function OrderSummary({
                   Rs. {Math.max(remaining, 0).toFixed(2)}
                 </span>
               </div>
+
+              {previousBalance > 0.009 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">
+                    Total balance after this sale
+                  </span>
+
+                  <span className="font-semibold">
+                    Rs. {(previousBalance + Math.max(remaining, 0)).toFixed(2)}
+                  </span>
+                </div>
+              )}
 
               {remaining > 0.009 && !customer && (
                 <p className="text-xs text-amber-500 font-medium">
@@ -569,9 +761,37 @@ export function OrderSummary({
             </div>
 
             <div className="border-t border-[var(--pos-stroke)] pt-2.5 space-y-1.5 text-xs">
-              <div className="flex justify-between font-bold text-sm">
-                <span>Total Amount:</span>
-                <span>Rs. {subtotal.toFixed(2)}</span>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Previous Balance:</span>
+                <span className="font-semibold text-foreground">
+                  Rs. {previousBalance.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Subtotal:</span>
+                <span className="font-semibold text-foreground">
+                  Rs. {subtotal.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Discount:</span>
+                <span className="font-semibold text-foreground">
+                  {discountValue > 0
+                    ? `- Rs. ${discountValue.toFixed(2)}`
+                    : "Rs. 0.00"}
+                </span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Delivery Charges:</span>
+                <span className="font-semibold text-foreground">
+                  {deliveryValue > 0
+                    ? `+ Rs. ${deliveryValue.toFixed(2)}`
+                    : "Rs. 0.00"}
+                </span>
+              </div>
+              <div className="flex justify-between font-bold text-sm border-t border-[var(--pos-stroke)] pt-1.5">
+                <span>Grand Total:</span>
+                <span>Rs. {grandTotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Payment Method:</span>
@@ -586,15 +806,15 @@ export function OrderSummary({
                 </span>
               </div>
               <div className="flex justify-between text-muted-foreground">
-                <span>Remaining Balance:</span>
+                <span>Balance Due:</span>
                 <span
                   className={
-                    remaining > 0.009
+                    previousBalance + Math.max(remaining, 0) > 0.009
                       ? "font-semibold text-amber-500"
                       : "font-semibold text-emerald-500"
                   }
                 >
-                  Rs. {Math.max(remaining, 0).toFixed(2)}
+                  Rs. {(previousBalance + Math.max(remaining, 0)).toFixed(2)}
                 </span>
               </div>
             </div>

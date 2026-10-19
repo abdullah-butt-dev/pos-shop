@@ -7,8 +7,10 @@ import {
   CalendarDays,
   ChevronDown,
   Clock,
+  Banknote,
   Download,
   Package,
+  PiggyBank,
   Receipt,
   RefreshCw,
   ShoppingCart,
@@ -25,6 +27,7 @@ import { DeleteSalesModal } from "@/components/pos/delete-sales-modal";
 import {
   downloadPosReceiptPDF,
   formatPakistanDateTime,
+  getSaleReceiptCharges,
 } from "@/lib/pos-receipt-pdf";
 import {
   getPakistanDate,
@@ -44,6 +47,9 @@ type DashboardData = {
   summary: {
     sales: number;
     profit: number;
+    gross_profit?: number;
+    expenses?: number;
+    net_profit?: number;
     purchases: number;
     customer_payments: number;
     supplier_payments: number;
@@ -197,7 +203,9 @@ export default function DashboardPage() {
 
   const sales = data?.summary.sales || 0;
   const purchases = data?.summary.purchases || 0;
-  const profit = data?.summary.profit || 0;
+  const grossProfit = data?.summary.gross_profit ?? data?.summary.profit ?? 0;
+  const expenses = data?.summary.expenses || 0;
+  const netProfit = data?.summary.net_profit ?? grossProfit - expenses;
 
   const recentSales = useMemo(() => {
     return data?.sales || [];
@@ -252,6 +260,7 @@ export default function DashboardPage() {
         (sum: number, item: any) => sum + Number(item.quantity || 0),
         0,
       ),
+      ...getSaleReceiptCharges(sale),
       grandTotal: Number(sale.total_amount),
       paidAmount: Number(sale.amount_paid),
       remainingAmount: Number(sale.amount_due),
@@ -415,8 +424,8 @@ export default function DashboardPage() {
                 icon={ShoppingCart}
                 label="Sales"
                 value={money(sales, currency)}
-                description="Recognized on sale date"
-                tooltip="Total value of goods sold in this period."
+                description="After discounts, incl. delivery"
+                tooltip="Total value of goods sold in this period, after discounts and including delivery charges."
               />
               <StatCard
                 icon={Truck}
@@ -428,10 +437,26 @@ export default function DashboardPage() {
               />
               <StatCard
                 icon={TrendingUp}
-                label="Profit"
-                value={money(profit, currency)}
-                description="Net profit from sales"
-                tooltip="Total sales revenue minus the wholesale purchase cost of the items sold."
+                label="Gross Profit"
+                value={money(grossProfit, currency)}
+                description="Sales minus cost of goods sold"
+                tooltip="Total sales revenue (after discounts, including delivery charges) minus the purchase cost of the items sold. Expenses are not deducted here."
+              />
+              <StatCard
+                icon={Banknote}
+                label="Total Expenses"
+                value={money(expenses, currency)}
+                description="Rent, meals and other costs"
+                href="/expenses"
+                tooltip="Sum of all expenses recorded in the Expenses section for this period."
+              />
+              <StatCard
+                icon={PiggyBank}
+                label="Net Profit"
+                value={money(netProfit, currency)}
+                description="Gross profit minus expenses"
+                danger={netProfit < 0}
+                tooltip="Gross Profit minus Total Expenses for this period. A negative number means expenses were higher than gross profit."
               />
             </div>
           </section>
